@@ -18,6 +18,7 @@ import {
   Clock,
 } from 'lucide-react';
 import { useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 
 export function Home() {
   return (
@@ -33,6 +34,8 @@ export function Home() {
 }
 
 function HeroSection() {
+  const { user } = useAuth();
+
   return (
     <section className="bg-gradient-to-b from-zinc-50 to-white py-20 lg:py-32">
       <div className="max-w-7xl mx-auto px-6 lg:px-8">
@@ -53,16 +56,26 @@ function HeroSection() {
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link to="/auth/register">
-              <Button variant="accent" size="lg" className="w-full sm:w-auto text-lg">
-                ابدأ مجاناً
-              </Button>
-            </Link>
-            <Link to="/auth/login">
-              <Button variant="outline" size="lg" className="w-full sm:w-auto text-lg">
-                تسجيل الدخول
-              </Button>
-            </Link>
+            {user ? (
+              <Link to="/app/dashboard">
+                <Button variant="accent" size="lg" className="w-full sm:w-auto text-lg">
+                  انتقل إلى لوحة التحكم
+                </Button>
+              </Link>
+            ) : (
+              <>
+                <Link to="/auth/register">
+                  <Button variant="accent" size="lg" className="w-full sm:w-auto text-lg">
+                    ابدأ مجاناً
+                  </Button>
+                </Link>
+                <Link to="/auth/login">
+                  <Button variant="outline" size="lg" className="w-full sm:w-auto text-lg">
+                    تسجيل الدخول
+                  </Button>
+                </Link>
+              </>
+            )}
           </div>
 
           <div className="flex items-center justify-center gap-8 mt-12 text-sm text-zinc-500">
@@ -475,6 +488,8 @@ function FAQSection() {
 }
 
 function FinalCTASection() {
+  const { user } = useAuth();
+
   return (
     <section className="py-20 lg:py-32 bg-gradient-to-br from-zinc-950 to-zinc-900">
       <div className="max-w-4xl mx-auto px-6 lg:px-8 text-center">
@@ -486,23 +501,36 @@ function FinalCTASection() {
         </p>
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12">
-          <Link to="/auth/register">
-            <Button
-              size="lg"
-              className="w-full sm:w-auto bg-white text-zinc-950 hover:bg-zinc-100 text-lg"
-            >
-              إنشاء حساب مجاني
-            </Button>
-          </Link>
-          <Link to="/auth/login">
-            <Button
-              variant="outline"
-              size="lg"
-              className="w-full sm:w-auto border-2 border-white text-white hover:bg-white/10 text-lg"
-            >
-              تسجيل الدخول
-            </Button>
-          </Link>
+          {user ? (
+            <Link to="/app/dashboard">
+              <Button
+                size="lg"
+                className="w-full sm:w-auto bg-white text-zinc-950 hover:bg-zinc-100 text-lg"
+              >
+                انتقل إلى لوحة التحكم
+              </Button>
+            </Link>
+          ) : (
+            <>
+              <Link to="/auth/register">
+                <Button
+                  size="lg"
+                  className="w-full sm:w-auto bg-white text-zinc-950 hover:bg-zinc-100 text-lg"
+                >
+                  إنشاء حساب مجاني
+                </Button>
+              </Link>
+              <Link to="/auth/login">
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className="w-full sm:w-auto border-2 border-white text-white hover:bg-white/10 text-lg"
+                >
+                  تسجيل الدخول
+                </Button>
+              </Link>
+            </>
+          )}
         </div>
 
         <div className="flex items-center justify-center gap-12 text-sm text-zinc-400">

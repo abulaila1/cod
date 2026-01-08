@@ -5,7 +5,6 @@ import { BusinessProvider } from '@/contexts/BusinessContext';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { OnboardingRoute } from '@/components/auth/OnboardingRoute';
 import { GlobalErrorBoundary } from '@/components/common/GlobalError';
-import { RootRedirector } from '@/components/common/RootRedirector';
 
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Home } from '@/pages/public/Home';
@@ -52,7 +51,7 @@ function App() {
           <BusinessProvider>
             <ToastProvider>
               <Routes>
-                <Route path="/home" element={<Home />} />
+                <Route path="/" element={<Home />} />
 
                 <Route path="/auth/login" element={<Login />} />
                 <Route path="/auth/register" element={<Register />} />
@@ -98,7 +97,6 @@ function App() {
                   <Route path="settings/employees" element={<EmployeesManagement />} />
                 </Route>
 
-                <Route path="/" element={<RootRedirector />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </ToastProvider>
