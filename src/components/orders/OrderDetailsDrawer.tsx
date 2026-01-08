@@ -50,9 +50,8 @@ export function OrderDetailsDrawer({
       if (orderData) {
         setEditForm({
           revenue: orderData.revenue,
-          cogs: orderData.cogs,
+          cost: orderData.cost,
           shipping_cost: orderData.shipping_cost,
-          ad_cost: orderData.ad_cost || 0,
           notes: orderData.notes || '',
         });
       }
@@ -93,12 +92,7 @@ export function OrderDetailsDrawer({
 
   const calculateNetProfit = () => {
     if (!order) return 0;
-    return (
-      order.revenue -
-      order.cogs -
-      order.shipping_cost -
-      (order.ad_cost || 0)
-    );
+    return order.profit || (order.revenue - order.cost - order.shipping_cost);
   };
 
   const formatCurrency = (num: number): string => {
@@ -235,13 +229,13 @@ export function OrderDetailsDrawer({
 
                     <div>
                       <label className="block text-sm font-medium text-zinc-700 mb-2">
-                        التكلفة (COGS)
+                        التكلفة
                       </label>
                       <Input
                         type="number"
-                        value={editForm.cogs}
+                        value={editForm.cost}
                         onChange={(e) =>
-                          setEditForm({ ...editForm, cogs: parseFloat(e.target.value) })
+                          setEditForm({ ...editForm, cost: parseFloat(e.target.value) })
                         }
                       />
                     </div>
@@ -258,19 +252,6 @@ export function OrderDetailsDrawer({
                             ...editForm,
                             shipping_cost: parseFloat(e.target.value),
                           })
-                        }
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-zinc-700 mb-2">
-                        تكلفة الإعلانات
-                      </label>
-                      <Input
-                        type="number"
-                        value={editForm.ad_cost}
-                        onChange={(e) =>
-                          setEditForm({ ...editForm, ad_cost: parseFloat(e.target.value) })
                         }
                       />
                     </div>
@@ -323,7 +304,7 @@ export function OrderDetailsDrawer({
                         التكلفة
                       </label>
                       <p className="text-lg font-bold text-zinc-950">
-                        {formatCurrency(order.cogs)} ج.م
+                        {formatCurrency(order.cost)} ج.م
                       </p>
                     </div>
 
@@ -333,15 +314,6 @@ export function OrderDetailsDrawer({
                       </label>
                       <p className="text-lg font-bold text-zinc-950">
                         {formatCurrency(order.shipping_cost)} ج.م
-                      </p>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-zinc-700 mb-1">
-                        الإعلانات
-                      </label>
-                      <p className="text-lg font-bold text-zinc-950">
-                        {formatCurrency(order.ad_cost || 0)} ج.م
                       </p>
                     </div>
 

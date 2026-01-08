@@ -41,26 +41,34 @@ export interface Product {
   id: string;
   business_id: string;
   name_ar: string;
+  name_en: string | null;
   sku: string | null;
-  base_cogs: number;
-  active: boolean;
+  cost: number;
+  is_active: boolean;
+  created_by: string | null;
   created_at: string;
 }
 
 export interface Order {
   id: string;
   business_id: string;
+  order_number: string | null;
   order_date: string;
+  customer_name: string | null;
+  customer_phone: string | null;
+  customer_address: string | null;
   country_id: string;
   carrier_id: string;
   employee_id: string;
   status_id: string;
   revenue: number;
-  cogs: number;
+  cost: number;
   shipping_cost: number;
-  ad_cost: number | null;
+  profit: number;
   notes: string | null;
+  created_by: string | null;
   created_at: string;
+  updated_at: string;
 }
 
 export interface OrderItem {
@@ -68,9 +76,9 @@ export interface OrderItem {
   business_id: string;
   order_id: string;
   product_id: string;
-  qty: number;
-  item_price: number;
-  item_cogs: number;
+  quantity: number;
+  unit_price: number;
+  unit_cost: number;
   created_at: string;
 }
 
@@ -142,9 +150,8 @@ export interface OrderListResponse {
 
 export interface OrderUpdatePatch {
   revenue?: number;
-  cogs?: number;
+  cost?: number;
   shipping_cost?: number;
-  ad_cost?: number;
   notes?: string;
   country_id?: string;
   carrier_id?: string;

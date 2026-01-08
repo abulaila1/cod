@@ -15,13 +15,13 @@ export interface ProductFilters {
 export interface CreateProductInput {
   name_ar: string;
   sku?: string;
-  base_cogs: number;
+  cost: number;
 }
 
 export interface UpdateProductInput {
   name_ar?: string;
   sku?: string;
-  base_cogs?: number;
+  cost?: number;
 }
 
 export class ProductsService {
@@ -29,7 +29,7 @@ export class ProductsService {
     let query = supabase.from('products').select('*').eq('business_id', businessId);
 
     if (filters.activeOnly !== undefined) {
-      query = query.eq('active', filters.activeOnly);
+      query = query.eq('is_active', filters.activeOnly);
     }
 
     if (filters.search) {
@@ -54,8 +54,8 @@ export class ProductsService {
         business_id: businessId,
         name_ar: input.name_ar,
         sku: input.sku || null,
-        base_cogs: input.base_cogs,
-        active: true,
+        cost: input.cost,
+        is_active: true,
       })
       .select()
       .single();
@@ -121,7 +121,7 @@ export class ProductsService {
 
     const { data, error } = await supabase
       .from('products')
-      .update({ active })
+      .update({ is_active: active })
       .eq('id', productId)
       .eq('business_id', businessId)
       .select()
@@ -147,15 +147,15 @@ export class ProductsService {
     const headers = [
       { key: 'name_ar', label: 'الاسم' },
       { key: 'sku', label: 'SKU' },
-      { key: 'base_cogs', label: 'التكلفة الأساسية' },
-      { key: 'active', label: 'نشط' },
+      { key: 'cost', label: 'التكلفة الأساسية' },
+      { key: 'is_active', label: 'نشط' },
     ];
 
     const data = products.map((p) => ({
       name_ar: p.name_ar,
       sku: p.sku || '',
-      base_cogs: p.base_cogs,
-      active: p.active ? 'نعم' : 'لا',
+      cost: p.cost,
+      is_active: p.is_active ? 'نعم' : 'لا',
     }));
 
     exportToExcel(data, `products-${Date.now()}.xlsx`, headers);
@@ -177,14 +177,14 @@ export class ProductsService {
 
         const name_ar = cols[0];
         const sku = cols[1] || null;
-        const base_cogs = parseFloat(cols[2]) || 0;
+        const cost = parseFloat(cols[2]) || 0;
 
         if (!name_ar) {
           results.errors.push(`السطر ${i + 2}: اسم المنتج مطلوب`);
           continue;
         }
 
-        await this.create(businessId, { name_ar, sku: sku || undefined, base_cogs });
+        await this.create(businessId, { name_ar, sku: sku || undefined, cost });
         results.success++;
       } catch (error: any) {
         results.errors.push(`السطر ${i + 2}: ${error.message}`);

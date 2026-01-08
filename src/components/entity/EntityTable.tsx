@@ -66,36 +66,39 @@ export function EntityTable({
                 </td>
               </tr>
             ) : (
-              data.map((row) => (
-                <tr key={row.id} className="hover:bg-zinc-50 transition-colors">
-                  {columns.map((col) => (
-                    <td key={col.key} className="px-6 py-4 text-sm text-zinc-950">
-                      {col.render ? col.render(row[col.key], row) : row[col.key] || '-'}
+              data.map((row) => {
+                const isActive = row.is_active ?? row.active ?? false;
+                return (
+                  <tr key={row.id} className="hover:bg-zinc-50 transition-colors">
+                    {columns.map((col) => (
+                      <td key={col.key} className="px-6 py-4 text-sm text-zinc-950">
+                        {col.render ? col.render(row[col.key], row) : row[col.key] || '-'}
+                      </td>
+                    ))}
+                    <td className="px-6 py-4">
+                      <Badge variant={isActive ? 'success' : 'secondary'}>
+                        {isActive ? 'نشط' : 'معطل'}
+                      </Badge>
                     </td>
-                  ))}
-                  <td className="px-6 py-4">
-                    <Badge variant={row.active ? 'success' : 'secondary'}>
-                      {row.active ? 'نشط' : 'معطل'}
-                    </Badge>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex gap-2">
-                      <Button size="sm" variant="outline" onClick={() => onEdit(row.id)}>
-                        <Edit2 className="h-4 w-4 ml-2" />
-                        تعديل
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant={row.active ? 'outline' : 'primary'}
-                        onClick={() => onToggleActive(row.id, row.active)}
-                      >
-                        <Power className="h-4 w-4 ml-2" />
-                        {row.active ? 'تعطيل' : 'تفعيل'}
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))
+                    <td className="px-6 py-4">
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="outline" onClick={() => onEdit(row.id)}>
+                          <Edit2 className="h-4 w-4 ml-2" />
+                          تعديل
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={isActive ? 'outline' : 'primary'}
+                          onClick={() => onToggleActive(row.id, isActive)}
+                        >
+                          <Power className="h-4 w-4 ml-2" />
+                          {isActive ? 'تعطيل' : 'تفعيل'}
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>

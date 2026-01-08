@@ -32,7 +32,7 @@ export function Dashboard() {
     const returned = safeOrders.filter(o => o.status?.counts_as_return).length;
 
     const totalRevenue = safeOrders.reduce((sum, o) => sum + (Number(o.revenue) || 0), 0);
-    const netProfit = safeOrders.reduce((sum, o) => sum + ((Number(o.revenue) || 0) - (Number(o.shipping_cost) || 0) - (Number(o.cogs) || 0)), 0);
+    const netProfit = safeOrders.reduce((sum, o) => sum + ((Number(o.revenue) || 0) - (Number(o.shipping_cost) || 0) - (Number(o.cost) || 0)), 0);
 
     const deliveryRate = totalOrders ? Math.round((delivered / totalOrders) * 100) : 0;
     const returnRate = totalOrders ? Math.round((returned / totalOrders) * 100) : 0;

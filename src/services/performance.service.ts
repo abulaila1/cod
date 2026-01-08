@@ -43,7 +43,7 @@ export class PerformanceService {
       const item = breakdown.get(countryId)!;
       item.total_orders++;
       item.gross_sales += order.revenue || 0;
-      item.net_profit += (order.revenue || 0) - (order.cogs || 0) - (order.shipping_cost || 0) - (order.ad_cost || 0);
+      item.net_profit += order.profit || ((order.revenue || 0) - (order.cost || 0) - (order.shipping_cost || 0));
 
       if (order.status.counts_as_delivered) {
         item.delivered_orders++;
@@ -102,7 +102,7 @@ export class PerformanceService {
       const item = breakdown.get(carrierId)!;
       item.total_orders++;
       item.gross_sales += order.revenue || 0;
-      item.net_profit += (order.revenue || 0) - (order.cogs || 0) - (order.shipping_cost || 0) - (order.ad_cost || 0);
+      item.net_profit += order.profit || ((order.revenue || 0) - (order.cost || 0) - (order.shipping_cost || 0));
 
       if (order.status.counts_as_delivered) {
         item.delivered_orders++;
@@ -161,7 +161,7 @@ export class PerformanceService {
       const item = breakdown.get(employeeId)!;
       item.total_orders++;
       item.gross_sales += order.revenue || 0;
-      item.net_profit += (order.revenue || 0) - (order.cogs || 0) - (order.shipping_cost || 0) - (order.ad_cost || 0);
+      item.net_profit += order.profit || ((order.revenue || 0) - (order.cost || 0) - (order.shipping_cost || 0));
 
       if (order.status.counts_as_delivered) {
         item.delivered_orders++;
@@ -226,9 +226,9 @@ export class PerformanceService {
       }
 
       const product = breakdown.get(productId)!;
-      product.total_items += item.qty || 1;
-      product.gross_sales += (item.item_price || 0) * (item.qty || 1);
-      product.net_profit += ((item.item_price || 0) - (item.item_cogs || 0)) * (item.qty || 1);
+      product.total_items += item.quantity || 1;
+      product.gross_sales += (item.unit_price || 0) * (item.quantity || 1);
+      product.net_profit += ((item.unit_price || 0) - (item.unit_cost || 0)) * (item.quantity || 1);
 
       if (item.order.status.counts_as_delivered) {
         product.delivered_orders++;

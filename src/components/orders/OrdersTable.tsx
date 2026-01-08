@@ -50,7 +50,7 @@ export function OrdersTable({
   };
 
   const calculateNetProfit = (order: OrderWithRelations): number => {
-    return order.revenue - order.cogs - order.shipping_cost - (order.ad_cost || 0);
+    return order.profit || (order.revenue - order.cost - order.shipping_cost);
   };
 
   return (
@@ -146,7 +146,7 @@ export function OrdersTable({
                   {formatCurrency(order.revenue)}
                 </td>
                 <td className="px-4 py-3 text-sm text-zinc-600">
-                  {formatCurrency(order.cogs)}
+                  {formatCurrency(order.cost)}
                 </td>
                 <td className="px-4 py-3 text-sm font-medium text-green-600">
                   {formatCurrency(calculateNetProfit(order))}

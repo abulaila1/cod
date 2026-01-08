@@ -68,9 +68,7 @@ export class ReportsService {
       summary.total_orders++;
       summary.gross_sales += order.revenue || 0;
 
-      const adCost = filters.include_ad_cost ? order.ad_cost || 0 : 0;
-      summary.net_profit +=
-        (order.revenue || 0) - (order.cogs || 0) - (order.shipping_cost || 0) - adCost;
+      summary.net_profit += order.profit || ((order.revenue || 0) - (order.cost || 0) - (order.shipping_cost || 0));
 
       if (order.status.counts_as_delivered) {
         summary.delivered_orders++;
@@ -133,7 +131,7 @@ export class ReportsService {
       filteredOrders = filteredOrders.filter((o) => orderIdsWithProduct.has(o.id));
     }
 
-    const grouped = this.groupOrders(filteredOrders, filters.group_by, filters.include_ad_cost);
+    const grouped = this.groupOrders(filteredOrders, filters.group_by);
 
     return {
       rows: grouped,
@@ -142,8 +140,7 @@ export class ReportsService {
 
   private static groupOrders(
     orders: any[],
-    groupBy: 'day' | 'week' | 'month',
-    includeAdCost?: boolean
+    groupBy: 'day' | 'week' | 'month'
   ): ReportRow[] {
     const groups = new Map<string, ReportRow>();
 
@@ -205,8 +202,7 @@ export class ReportsService {
       row.total_orders++;
       row.gross_sales += order.revenue || 0;
 
-      const adCost = includeAdCost ? order.ad_cost || 0 : 0;
-      row.net_profit += (order.revenue || 0) - (order.cogs || 0) - (order.shipping_cost || 0) - adCost;
+      row.net_profit += order.profit || ((order.revenue || 0) - (order.cost || 0) - (order.shipping_cost || 0));
 
       if (order.status.counts_as_delivered) {
         row.delivered_orders++;

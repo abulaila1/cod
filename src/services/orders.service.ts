@@ -245,9 +245,8 @@ export class OrdersService {
     const result: any = {};
 
     if (patch.revenue !== undefined) result.revenue = order.revenue;
-    if (patch.cogs !== undefined) result.cogs = order.cogs;
+    if (patch.cost !== undefined) result.cost = order.cost;
     if (patch.shipping_cost !== undefined) result.shipping_cost = order.shipping_cost;
-    if (patch.ad_cost !== undefined) result.ad_cost = order.ad_cost;
     if (patch.notes !== undefined) result.notes = order.notes;
     if (patch.country_id !== undefined) {
       result.country_id = order.country_id;
@@ -332,7 +331,6 @@ export class OrdersService {
       'الإيراد',
       'التكلفة',
       'الشحن',
-      'الإعلانات',
       'الربح الصافي',
       'ملاحظات',
     ];
@@ -345,15 +343,9 @@ export class OrdersService {
       order.carrier.name_ar,
       order.employee.name_ar,
       order.revenue.toFixed(2),
-      order.cogs.toFixed(2),
+      order.cost.toFixed(2),
       order.shipping_cost.toFixed(2),
-      (order.ad_cost || 0).toFixed(2),
-      (
-        order.revenue -
-        order.cogs -
-        order.shipping_cost -
-        (order.ad_cost || 0)
-      ).toFixed(2),
+      order.profit.toFixed(2),
       order.notes || '',
     ]);
 
@@ -394,7 +386,7 @@ export class OrdersService {
           business_id: businessId,
           order_date: new Date().toISOString().split('T')[0],
           revenue: 0,
-          cogs: 0,
+          cost: 0,
           shipping_cost: 0,
         };
 
@@ -499,9 +491,8 @@ export class OrdersService {
       employee_id?: string;
       status_id?: string;
       revenue?: number;
-      cogs?: number;
+      cost?: number;
       shipping_cost?: number;
-      ad_cost?: number;
       notes?: string;
     }
   ): Promise<Order> {
@@ -517,9 +508,8 @@ export class OrdersService {
         employee_id: orderData.employee_id || null,
         status_id: orderData.status_id || null,
         revenue: orderData.revenue || 0,
-        cogs: orderData.cogs || 0,
+        cost: orderData.cost || 0,
         shipping_cost: orderData.shipping_cost || 0,
-        ad_cost: orderData.ad_cost || null,
         notes: orderData.notes || null,
       })
       .select()

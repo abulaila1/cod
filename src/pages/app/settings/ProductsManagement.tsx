@@ -22,7 +22,7 @@ export function ProductsManagement() {
   const [formData, setFormData] = useState({
     name_ar: '',
     sku: '',
-    base_cogs: 0,
+    cost: 0,
   });
 
   useEffect(() => {
@@ -49,7 +49,7 @@ export function ProductsManagement() {
 
   const handleAdd = () => {
     setEditingProduct(null);
-    setFormData({ name_ar: '', sku: '', base_cogs: 0 });
+    setFormData({ name_ar: '', sku: '', cost: 0 });
     setIsModalOpen(true);
   };
 
@@ -60,7 +60,7 @@ export function ProductsManagement() {
       setFormData({
         name_ar: product.name_ar,
         sku: product.sku || '',
-        base_cogs: product.base_cogs,
+        cost: product.cost,
       });
       setIsModalOpen(true);
     }
@@ -122,9 +122,9 @@ export function ProductsManagement() {
     { key: 'name_ar', label: 'الاسم' },
     { key: 'sku', label: 'SKU' },
     {
-      key: 'base_cogs',
+      key: 'cost',
       label: 'التكلفة الأساسية',
-      render: (value) => `${value.toFixed(2)} ج.م`,
+      render: (value) => `${(value || 0).toFixed(2)} ج.م`,
     },
   ];
 
@@ -191,8 +191,8 @@ export function ProductsManagement() {
           </label>
           <Input
             type="number"
-            value={formData.base_cogs}
-            onChange={(e) => setFormData({ ...formData, base_cogs: parseFloat(e.target.value) || 0 })}
+            value={formData.cost}
+            onChange={(e) => setFormData({ ...formData, cost: parseFloat(e.target.value) || 0 })}
             placeholder="0.00"
             step="0.01"
           />
