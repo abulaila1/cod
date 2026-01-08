@@ -7,6 +7,7 @@ interface Business {
   name: string;
   created_by: string;
   created_at: string;
+  status?: 'active' | 'suspended';
 }
 
 interface BusinessMember {
@@ -23,6 +24,7 @@ interface BusinessContextValue {
   membership: BusinessMember | null;
   isLoading: boolean;
   error: string | null;
+  isSuspended: boolean;
   switchBusiness: (businessId: string) => void;
   refreshBusinesses: () => Promise<void>;
   ensureWorkspace: () => Promise<Business | null>;
@@ -56,7 +58,7 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
 
       const { data: memberships, error: memberError } = await supabase
         .from('business_members')
-        .select('business_id, role, status, businesses(id, name, created_by, created_at)')
+        .select('business_id, role, status, businesses(id, name, created_by, created_at, status)')
         .eq('user_id', user!.id)
         .eq('status', 'active');
 
@@ -169,6 +171,8 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const isSuspended = currentBusiness?.status === 'suspended';
+
   return (
     <BusinessContext.Provider
       value={{
@@ -177,6 +181,7 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
         membership,
         isLoading,
         error,
+        isSuspended,
         switchBusiness,
         refreshBusinesses,
         ensureWorkspace,

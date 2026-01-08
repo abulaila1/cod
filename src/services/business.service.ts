@@ -1,14 +1,25 @@
 import { supabase } from './supabase';
 import type { Business, ManualPaymentStatus } from '../types/business';
 
-export interface AdminWorkspace extends Business {
-  billing?: {
-    status: string;
-    plan: string;
-    is_trial: boolean;
-  } | null;
-  owner_email?: string;
-  total_orders?: number;
+export type WorkspaceStatus = 'active' | 'suspended';
+
+export interface AdminWorkspace {
+  id: string;
+  name: string;
+  slug: string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  plan_type: string;
+  is_lifetime_deal: boolean;
+  manual_payment_status: string;
+  max_orders_limit: number | null;
+  settings: Record<string, unknown> | null;
+  status: WorkspaceStatus;
+  owner_email: string | null;
+  billing_status: string | null;
+  billing_plan: string | null;
+  is_trial: boolean | null;
 }
 
 export interface AdminStats {
@@ -83,22 +94,51 @@ export class BusinessService {
   }
 
   static async getAllWorkspacesForAdmin(): Promise<AdminWorkspace[]> {
-    const { data, error } = await supabase
-      .from('businesses')
-      .select(`
-        *,
-        billing:business_billing(status, plan, is_trial)
-      `)
-      .order('created_at', { ascending: false });
+    const { data, error } = await supabase.rpc('get_all_workspaces_with_owners');
 
     if (error) throw error;
+    return (data || []) as AdminWorkspace[];
+  }
 
-    const workspaces: AdminWorkspace[] = (data || []).map((b: any) => ({
-      ...b,
-      billing: b.billing?.[0] || null,
-    }));
+  static async toggleWorkspaceStatus(
+    businessId: string,
+    status: WorkspaceStatus
+  ): Promise<Business> {
+    const { data, error } = await supabase
+      .from('businesses')
+      .update({
+        status,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', businessId)
+      .select()
+      .single();
 
-    return workspaces;
+    if (error) throw error;
+    return data;
+  }
+
+  static async deleteWorkspaceAsAdmin(businessId: string): Promise<void> {
+    const { error: membersError } = await supabase
+      .from('business_members')
+      .delete()
+      .eq('business_id', businessId);
+
+    if (membersError) throw membersError;
+
+    const { error: billingError } = await supabase
+      .from('business_billing')
+      .delete()
+      .eq('business_id', businessId);
+
+    if (billingError) throw billingError;
+
+    const { error } = await supabase
+      .from('businesses')
+      .delete()
+      .eq('id', businessId);
+
+    if (error) throw error;
   }
 
   static async getAdminStats(): Promise<AdminStats> {

@@ -37,6 +37,7 @@ import { Billing } from '@/pages/app/Billing';
 import { InviteAcceptance } from '@/pages/public/InviteAcceptance';
 import { NotFound } from '@/pages/NotFound';
 import SuperDashboard from '@/pages/admin/SuperDashboard';
+import { AccountSuspended } from '@/pages/app/AccountSuspended';
 
 import { ConfigurationError } from '@/components/common/ConfigurationError';
 import { isSupabaseConfigured } from '@/services/supabase';
@@ -108,6 +109,8 @@ function App() {
                     </ProtectedRoute>
                   }
                 />
+
+                <Route path="/suspended" element={<AccountSuspended />} />
 
                 <Route path="*" element={<NotFound />} />
                 </Routes>
