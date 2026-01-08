@@ -27,6 +27,7 @@ import {
   User,
   Lock,
   ChevronLeft,
+  AlertCircle,
 } from 'lucide-react';
 import type { PerformanceBreakdown } from '@/types/performance';
 
@@ -62,6 +63,8 @@ export function Employees() {
   const [showPassword, setShowPassword] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
+  const [showLoginInfo, setShowLoginInfo] = useState(false);
+  const [selectedEmployeeForLogin, setSelectedEmployeeForLogin] = useState<Employee | null>(null);
 
   useEffect(() => {
     if (currentBusiness) {
@@ -217,6 +220,17 @@ export function Employees() {
       showToast('error', 'فشل في حذف الموظف');
     }
     setActiveMenu(null);
+  };
+
+  const handleShowLoginInfo = (employee: Employee) => {
+    setSelectedEmployeeForLogin(employee);
+    setShowLoginInfo(true);
+    setActiveMenu(null);
+  };
+
+  const copyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    showToast('success', `تم نسخ ${label}`);
   };
 
   const filteredEmployees = employees.filter(e =>
@@ -396,6 +410,13 @@ export function Employees() {
                                 تفعيل
                               </>
                             )}
+                          </button>
+                          <button
+                            onClick={() => handleShowLoginInfo(employee)}
+                            className="w-full px-4 py-2 text-right text-sm hover:bg-zinc-50 flex items-center gap-2 text-blue-600"
+                          >
+                            <Lock className="w-4 h-4" />
+                            معلومات الدخول
                           </button>
                           <button
                             onClick={() => handleDelete(employee)}
@@ -587,6 +608,101 @@ export function Employees() {
             </Button>
           </div>
         </div>
+      </Modal>
+
+      <Modal
+        isOpen={showLoginInfo}
+        onClose={() => setShowLoginInfo(false)}
+        title="معلومات تسجيل دخول الموظف"
+      >
+        {selectedEmployeeForLogin && currentBusiness && (
+          <div className="space-y-4">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+              <p className="text-sm text-blue-800">
+                شارك هذه المعلومات مع الموظف ليتمكن من تسجيل الدخول إلى لوحة التحكم الخاصة به
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                رابط تسجيل الدخول
+              </label>
+              <div className="flex items-center gap-2">
+                <Input
+                  value={`${window.location.origin}/employee/login`}
+                  readOnly
+                  className="flex-1"
+                />
+                <Button
+                  onClick={() => copyToClipboard(`${window.location.origin}/employee/login`, 'رابط تسجيل الدخول')}
+                  variant="secondary"
+                >
+                  نسخ
+                </Button>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                معرف الوورك سبيس (Business ID)
+              </label>
+              <div className="flex items-center gap-2">
+                <Input
+                  value={currentBusiness.id}
+                  readOnly
+                  className="flex-1 font-mono text-sm"
+                />
+                <Button
+                  onClick={() => copyToClipboard(currentBusiness.id, 'معرف الوورك سبيس')}
+                  variant="secondary"
+                >
+                  نسخ
+                </Button>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                البريد الإلكتروني
+              </label>
+              <div className="flex items-center gap-2">
+                <Input
+                  value={selectedEmployeeForLogin.email || 'لم يتم تعيين بريد إلكتروني'}
+                  readOnly
+                  className="flex-1"
+                />
+                {selectedEmployeeForLogin.email && (
+                  <Button
+                    onClick={() => copyToClipboard(selectedEmployeeForLogin.email!, 'البريد الإلكتروني')}
+                    variant="secondary"
+                  >
+                    نسخ
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                <div className="text-sm text-yellow-800">
+                  <p className="font-medium mb-1">ملاحظة مهمة:</p>
+                  <ul className="list-disc list-inside space-y-1">
+                    <li>تأكد من أن الموظف لديه كلمة مرور مُعينة</li>
+                    <li>يجب أن يكون الحساب مفعّلاً (نشط)</li>
+                    <li>تأكد من منح الموظف الصلاحيات المناسبة</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-4">
+              <Button onClick={() => setShowLoginInfo(false)}>
+                إغلاق
+              </Button>
+            </div>
+          </div>
+        )}
       </Modal>
     </>
   );

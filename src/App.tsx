@@ -3,8 +3,10 @@ import { ToastProvider } from '@/components/ui';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { BusinessProvider } from '@/contexts/BusinessContext';
 import { SuperAdminProvider } from '@/contexts/SuperAdminContext';
+import { EmployeeProvider } from '@/contexts/EmployeeContext';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { OnboardingRoute } from '@/components/auth/OnboardingRoute';
+import { EmployeeProtectedRoute } from '@/components/auth/EmployeeProtectedRoute';
 import { GlobalErrorBoundary } from '@/components/common/GlobalError';
 
 import { AppLayout } from '@/components/layout/AppLayout';
@@ -41,6 +43,9 @@ import { NotFound } from '@/pages/NotFound';
 import SuperDashboard from '@/pages/admin/SuperDashboard';
 import { AccountSuspended } from '@/pages/app/AccountSuspended';
 
+import { EmployeeLogin } from '@/pages/employee/EmployeeLogin';
+import { EmployeeDashboard } from '@/pages/employee/EmployeeDashboard';
+
 import { ConfigurationError } from '@/components/common/ConfigurationError';
 import { isSupabaseConfigured } from '@/services/supabase';
 
@@ -55,8 +60,9 @@ function App() {
         <AuthProvider>
           <SuperAdminProvider>
             <BusinessProvider>
-              <ToastProvider>
-                <Routes>
+              <EmployeeProvider>
+                <ToastProvider>
+                  <Routes>
                 <Route path="/" element={<Home />} />
 
                 <Route path="/auth/login" element={<Login />} />
@@ -114,11 +120,22 @@ function App() {
                   }
                 />
 
+                <Route path="/employee/login" element={<EmployeeLogin />} />
+                <Route
+                  path="/employee/dashboard"
+                  element={
+                    <EmployeeProtectedRoute>
+                      <EmployeeDashboard />
+                    </EmployeeProtectedRoute>
+                  }
+                />
+
                 <Route path="/suspended" element={<AccountSuspended />} />
 
                 <Route path="*" element={<NotFound />} />
-                </Routes>
-              </ToastProvider>
+                  </Routes>
+                </ToastProvider>
+              </EmployeeProvider>
             </BusinessProvider>
           </SuperAdminProvider>
         </AuthProvider>
