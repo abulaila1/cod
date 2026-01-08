@@ -99,10 +99,8 @@ export function Onboarding() {
         .insert({
           business_id: business.id,
           user_id: user.id,
-          role: 'owner',
+          role: 'admin',
           status: 'active',
-          invited_by: user.id,
-          joined_at: new Date().toISOString(),
         });
 
       if (memberError) {
@@ -119,11 +117,11 @@ export function Onboarding() {
         .from('business_billing')
         .insert({
           business_id: business.id,
-          plan_type: 'trial',
+          plan: 'starter',
           status: 'trial',
+          is_trial: true,
           trial_ends_at: trialEndsAt.toISOString(),
-          current_period_start: new Date().toISOString(),
-          current_period_end: trialEndsAt.toISOString(),
+          created_by: user.id,
         });
 
       if (billingError) {
