@@ -14,7 +14,7 @@ interface AuthContextValue {
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
-  isNoWorkspace: boolean;
+  needsOnboarding: boolean;
   signUp: (email: string, password: string, name: string) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -31,7 +31,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isNoWorkspace, setIsNoWorkspace] = useState(false);
+  const [needsOnboarding, setNeedsOnboarding] = useState(false);
 
   useEffect(() => {
     initializeAuth();
@@ -74,7 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await checkWorkspaceStatusForUser(authUser.id);
     } else {
       setUser(null);
-      setIsNoWorkspace(false);
+      setNeedsOnboarding(false);
     }
   };
 
@@ -89,23 +89,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (queryError) {
         console.error('Error checking workspace status:', queryError);
-        setIsNoWorkspace(true);
-        setError(`خطأ في التحقق من الوورك سبيس: ${queryError.message}`);
+        setNeedsOnboarding(true);
+        setError(null);
         return;
       }
 
       if (!data) {
-        console.warn('User has no workspace - flagging isNoWorkspace');
-        setIsNoWorkspace(true);
+        console.log('User has no workspace - needs onboarding');
+        setNeedsOnboarding(true);
         setError(null);
       } else {
-        setIsNoWorkspace(false);
+        console.log('User has workspace - onboarding complete');
+        setNeedsOnboarding(false);
         setError(null);
       }
     } catch (err) {
       console.error('Unexpected error checking workspace:', err);
-      setIsNoWorkspace(true);
-      setError(err instanceof Error ? err.message : 'خطأ غير متوقع');
+      setNeedsOnboarding(true);
+      setError(null);
     }
   };
 
@@ -193,7 +194,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
     setUser(null);
     setSession(null);
-    setIsNoWorkspace(false);
+    setNeedsOnboarding(false);
     setError(null);
     localStorage.removeItem('currentBusinessId');
   };
@@ -236,7 +237,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAuthenticated: !!user && !!session,
         isLoading,
         error,
-        isNoWorkspace,
+        needsOnboarding,
         signUp,
         signIn,
         signOut,

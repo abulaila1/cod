@@ -8,7 +8,7 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { isAuthenticated, isLoading: authLoading, isNoWorkspace } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, needsOnboarding } = useAuth();
   const { currentBusiness, isLoading: businessLoading } = useBusiness();
 
   if (authLoading || businessLoading) {
@@ -26,7 +26,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     return <Navigate to="/auth/login" replace />;
   }
 
-  if (isNoWorkspace) {
+  if (needsOnboarding) {
     return <Navigate to="/onboarding" replace />;
   }
 

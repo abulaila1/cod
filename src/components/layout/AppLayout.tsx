@@ -1,4 +1,5 @@
 import { ReactNode, useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 
@@ -9,6 +10,17 @@ interface AppLayoutProps {
 
 export function AppLayout({ pageTitle, children }: AppLayoutProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const { needsOnboarding } = useAuth();
+
+  if (needsOnboarding) {
+    return (
+      <div className="min-h-screen bg-zinc-50 flex items-center justify-center p-4">
+        <div className="text-center">
+          <p className="text-gray-600">جاري التحميل...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-primary-50 flex">
