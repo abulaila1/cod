@@ -1,516 +1,517 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { PageHeader } from '@/components/common/PageHeader';
-import { Card, CardContent, Button, Badge, Modal } from '@/components/ui';
+import { Card, CardContent, Button, Badge, Modal, Input } from '@/components/ui';
 import { useBusiness } from '@/contexts/BusinessContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { BillingService } from '@/services/billing.service';
 import { UsageService } from '@/services/usage.service';
-import { Check, CreditCard, TrendingUp, AlertTriangle, Sparkles } from 'lucide-react';
+import {
+  Check,
+  CreditCard,
+  Clock,
+  AlertTriangle,
+  Zap,
+  Crown,
+  Building2,
+  Rocket,
+  MessageCircle,
+  Copy,
+  CheckCircle,
+  X,
+  Percent,
+} from 'lucide-react';
 import type { Billing, PlanType, PlanDetails } from '@/types/billing';
 import type { UsageStatus } from '@/services/usage.service';
-import { PLAN_CONFIG } from '@/types/billing';
-import { TrialCountdown } from '@/components/billing/TrialCountdown';
+import { PLAN_CONFIG, WHATSAPP_NUMBER, BANK_DETAILS } from '@/types/billing';
 
 const PLANS: PlanDetails[] = [
   { key: 'starter', ...PLAN_CONFIG.starter },
-  { key: 'growth', ...PLAN_CONFIG.growth },
   { key: 'pro', ...PLAN_CONFIG.pro },
+  { key: 'elite', ...PLAN_CONFIG.elite },
+  { key: 'enterprise', ...PLAN_CONFIG.enterprise },
 ];
+
+const PLAN_ICONS: Record<PlanType, React.ReactNode> = {
+  starter: <Rocket className="h-6 w-6" />,
+  pro: <Zap className="h-6 w-6" />,
+  elite: <Crown className="h-6 w-6" />,
+  enterprise: <Building2 className="h-6 w-6" />,
+};
+
+function formatTime(ms: number): string {
+  const totalSeconds = Math.floor(ms / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+}
 
 export function Billing() {
   const { currentBusiness, currentMember } = useBusiness();
+  const { user } = useAuth();
   const [billing, setBilling] = useState<Billing | null>(null);
   const [usage, setUsage] = useState<UsageStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasDiscount, setHasDiscount] = useState(false);
+  const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
 
-  const [isActivateModalOpen, setIsActivateModalOpen] = useState(false);
-  const [isDeactivateModalOpen, setIsDeactivateModalOpen] = useState(false);
-  const [isChangePlanModalOpen, setIsChangePlanModalOpen] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState<PlanType | null>(null);
+  const [isManualPaymentModalOpen, setIsManualPaymentModalOpen] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<PlanDetails | null>(null);
+  const [receiptRef, setReceiptRef] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
 
   const canManage = currentMember?.role === 'admin' || currentMember?.role === 'manager';
 
-  useEffect(() => {
-    if (currentBusiness) {
-      loadBillingData();
-    }
-  }, [currentBusiness]);
-
-  const loadBillingData = async () => {
-    if (!currentBusiness) return;
+  const loadBillingData = useCallback(async () => {
+    if (!currentBusiness || !user) return;
 
     try {
       setIsLoading(true);
-      const [billingData, usageData] = await Promise.all([
+      const [billingData, usageData, discountEligible] = await Promise.all([
         BillingService.getBilling(currentBusiness.id),
         UsageService.getUsageStatus(currentBusiness.id),
+        BillingService.checkDiscountEligibility(user.id),
       ]);
 
       setBilling(billingData);
       setUsage(usageData);
+      setHasDiscount(discountEligible);
+
+      if (billingData) {
+        const remaining = BillingService.getTrialTimeRemaining(billingData);
+        setTimeRemaining(remaining);
+      }
     } catch (error) {
       console.error('Failed to load billing data:', error);
     } finally {
       setIsLoading(false);
     }
+  }, [currentBusiness, user]);
+
+  useEffect(() => {
+    loadBillingData();
+  }, [loadBillingData]);
+
+  useEffect(() => {
+    if (timeRemaining === null || timeRemaining <= 0) return;
+
+    const interval = setInterval(() => {
+      setTimeRemaining((prev) => {
+        if (prev === null || prev <= 1000) {
+          clearInterval(interval);
+          loadBillingData();
+          return 0;
+        }
+        return prev - 1000;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [timeRemaining, loadBillingData]);
+
+  const handleCopy = async (text: string, field: string) => {
+    await navigator.clipboard.writeText(text);
+    setCopiedField(field);
+    setTimeout(() => setCopiedField(null), 2000);
   };
 
-  const handleActivate = async () => {
-    if (!currentBusiness) return;
+  const handleOpenManualPayment = (plan: PlanDetails) => {
+    setSelectedPlan(plan);
+    setReceiptRef('');
+    setPaymentSuccess(false);
+    setIsManualPaymentModalOpen(true);
+  };
+
+  const handleSubmitManualPayment = async () => {
+    if (!currentBusiness || !selectedPlan || !receiptRef.trim()) return;
 
     try {
       setIsProcessing(true);
-      await BillingService.activate(currentBusiness.id);
+      const finalPrice = hasDiscount
+        ? BillingService.getDiscountedPrice(selectedPlan.price)
+        : selectedPlan.price;
+
+      await BillingService.submitManualPayment(
+        currentBusiness.id,
+        selectedPlan.key,
+        finalPrice,
+        receiptRef.trim()
+      );
+
+      setPaymentSuccess(true);
       await loadBillingData();
-      setIsActivateModalOpen(false);
     } catch (error) {
-      console.error('Failed to activate:', error);
+      console.error('Failed to submit manual payment:', error);
     } finally {
       setIsProcessing(false);
     }
   };
 
-  const handleDeactivate = async () => {
-    if (!currentBusiness) return;
+  const handleWhatsAppClick = () => {
+    if (!selectedPlan || !currentBusiness) return;
 
-    try {
-      setIsProcessing(true);
-      await BillingService.deactivate(currentBusiness.id);
-      await loadBillingData();
-      setIsDeactivateModalOpen(false);
-    } catch (error) {
-      console.error('Failed to deactivate:', error);
-    } finally {
-      setIsProcessing(false);
-    }
+    const finalPrice = hasDiscount
+      ? BillingService.getDiscountedPrice(selectedPlan.price)
+      : selectedPlan.price;
+
+    const message = BillingService.formatWhatsAppMessage(
+      selectedPlan.nameAr,
+      finalPrice,
+      currentBusiness.name
+    );
+
+    window.open(`https://wa.me/${WHATSAPP_NUMBER.replace('+', '')}?text=${message}`, '_blank');
   };
 
-  const handleChangePlan = async () => {
-    if (!currentBusiness || !selectedPlan) return;
-
-    try {
-      setIsProcessing(true);
-      await BillingService.setPlan(currentBusiness.id, selectedPlan);
-      await loadBillingData();
-      setIsChangePlanModalOpen(false);
-      setSelectedPlan(null);
-    } catch (error) {
-      console.error('Failed to change plan:', error);
-    } finally {
-      setIsProcessing(false);
-    }
+  const getPrice = (plan: PlanDetails): { original: number; final: number } => {
+    const original = plan.price;
+    const final = hasDiscount ? BillingService.getDiscountedPrice(original) : original;
+    return { original, final };
   };
 
   if (!currentBusiness) {
     return (
-      <>
-        <div className="text-center py-12">
-          <p className="text-zinc-600">لم يتم تحديد وورك سبيس</p>
-        </div>
-      </>
+      <div className="text-center py-12">
+        <p className="text-zinc-600">لم يتم تحديد مساحة العمل</p>
+      </div>
     );
   }
 
-  if (isLoading || !billing || !usage) {
+  if (isLoading) {
     return (
-      <>
-        <div className="text-center py-12">
-          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent"></div>
-          <p className="mt-4 text-zinc-600">جاري التحميل...</p>
-        </div>
-      </>
+      <div className="text-center py-12">
+        <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-emerald-600 border-r-transparent"></div>
+        <p className="mt-4 text-zinc-600">جاري التحميل...</p>
+      </div>
     );
   }
 
-  const currentPlanDetails = PLANS.find((p) => p.key === billing.plan);
-  const isTrialActive = BillingService.isTrialActive(billing);
-  const isTrialExpired = BillingService.isTrialExpired(billing);
+  const isTrialActive = billing && BillingService.isTrialActive(billing);
+  const isTrialExpired = billing && BillingService.isTrialExpired(billing);
+  const isPendingPayment = currentBusiness && (currentBusiness as any).manual_payment_status === 'pending';
 
   return (
-    <>
+    <div className="max-w-6xl mx-auto">
       <PageHeader
-        title="الفوترة والخطة"
-        description="إدارة خطة الاشتراك واستخدام الطلبات الشهري"
+        title="الاشتراك والفوترة"
+        description="اختر الخطة المناسبة لك واستمتع بالوصول مدى الحياة"
       />
 
-      {isTrialActive && billing.trial_ends_at && (
-        <Card className="mb-6 bg-gradient-to-r from-blue-50 to-cyan-50 border-blue-200">
-          <CardContent>
-            <div className="flex items-start gap-4">
-              <div className="bg-blue-100 p-3 rounded-lg">
-                <Sparkles className="h-6 w-6 text-blue-600" />
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-2">
-                  <h3 className="text-lg font-semibold text-blue-950">
-                    التجربة المجانية نشطة
-                  </h3>
-                  <Badge variant="primary" className="bg-blue-600">
-                    تجربة مجانية
-                  </Badge>
-                </div>
-                <p className="text-sm text-blue-800 mb-4">
-                  لديك 24 ساعة لتجربة النظام مجاناً بدون بطاقة. استكشف جميع الميزات!
-                </p>
-                <TrialCountdown
-                  trialEndsAt={billing.trial_ends_at}
-                  onExpired={() => loadBillingData()}
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {isTrialExpired && (
-        <Card className="mb-6 bg-red-50 border-red-200">
-          <CardContent>
-            <div className="flex items-start gap-3">
-              <div className="bg-red-100 p-3 rounded-lg">
-                <AlertTriangle className="h-6 w-6 text-red-600" />
-              </div>
-              <div className="flex-1">
-                <h3 className="text-lg font-semibold text-red-950 mb-2">
-                  انتهت فترة التجربة المجانية
-                </h3>
-                <p className="text-sm text-red-800 mb-4">
-                  انتهت فترة التجربة المجانية. الرجاء الاشتراك لتكملة الاستخدام. يمكنك
-                  الاطلاع على التقارير والبيانات الحالية، ولكن لا يمكنك إضافة طلبات جديدة.
-                </p>
-                {canManage && (
-                  <Button
-                    variant="primary"
-                    onClick={() => setIsActivateModalOpen(true)}
-                    className="bg-red-600 hover:bg-red-700"
-                  >
-                    اشترك الآن
-                  </Button>
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        <Card>
-          <CardContent>
-            <div className="flex items-start justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <div className="bg-blue-50 p-3 rounded-lg">
-                  <CreditCard className="h-6 w-6 text-blue-600" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-zinc-950">خطتك الحالية</h3>
-                  <p className="text-sm text-zinc-600">
-                    {currentPlanDetails?.name} - ${billing.lifetime_price_usd} مدى الحياة
-                  </p>
-                </div>
-              </div>
-              <Badge
-                variant={
-                  billing.status === 'active'
-                    ? 'success'
-                    : billing.status === 'trial'
-                    ? 'primary'
-                    : 'secondary'
-                }
-              >
-                {billing.status === 'active'
-                  ? 'نشط'
-                  : billing.status === 'trial'
-                  ? 'تجربة مجانية'
-                  : 'غير نشط'}
-              </Badge>
-            </div>
-
-            <div className="space-y-2 mb-6">
-              {currentPlanDetails?.features.map((feature, index) => (
-                <div key={index} className="flex items-center gap-2 text-sm text-zinc-700">
-                  <Check className="h-4 w-4 text-green-600 flex-shrink-0" />
-                  <span>{feature}</span>
-                </div>
-              ))}
-            </div>
-
-            {canManage && (
-              <div className="flex gap-2">
-                {billing.status === 'inactive' || billing.status === 'trial' ? (
-                  <Button
-                    variant="primary"
-                    onClick={() => setIsActivateModalOpen(true)}
-                    className="flex-1"
-                  >
-                    {billing.status === 'trial' ? 'اشترك الآن' : 'تفعيل الاشتراك'}
-                  </Button>
-                ) : (
-                  <Button
-                    variant="outline"
-                    onClick={() => setIsDeactivateModalOpen(true)}
-                    className="flex-1"
-                  >
-                    إلغاء التفعيل
-                  </Button>
-                )}
-                <Button
-                  variant="outline"
-                  onClick={() => setIsChangePlanModalOpen(true)}
-                  className="flex-1"
-                >
-                  تغيير الخطة
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent>
-            <div className="flex items-start gap-3 mb-6">
-              <div className="bg-green-50 p-3 rounded-lg">
-                <TrendingUp className="h-6 w-6 text-green-600" />
+      {isTrialActive && timeRemaining !== null && timeRemaining > 0 && (
+        <div className="mb-8 bg-gradient-to-r from-amber-500 to-orange-500 rounded-2xl p-6 text-white shadow-lg">
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <div className="flex items-center gap-4">
+              <div className="bg-white/20 p-3 rounded-xl">
+                <Clock className="h-8 w-8" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-zinc-950">استخدام هذا الشهر</h3>
-                <p className="text-sm text-zinc-600">{usage.month_label}</p>
+                <h3 className="text-xl font-bold">التجربة المجانية نشطة</h3>
+                <p className="text-white/90">استكشف جميع الميزات قبل انتهاء الوقت</p>
               </div>
             </div>
-
-            <div className="mb-4">
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-sm font-medium text-zinc-700">
-                  {usage.current_month_count.toLocaleString('ar-EG')} /{' '}
-                  {usage.limit !== null
-                    ? usage.limit.toLocaleString('ar-EG')
-                    : 'غير محدود'}{' '}
-                  طلب
-                </span>
-                <span className="text-sm text-zinc-600">
-                  {usage.limit !== null ? `${usage.percent_used.toFixed(0)}%` : ''}
-                </span>
+            <div className="text-center">
+              <div className="text-4xl font-mono font-bold tracking-wider bg-white/20 px-6 py-3 rounded-xl">
+                {formatTime(timeRemaining)}
               </div>
-              <div className="w-full bg-zinc-200 rounded-full h-3">
-                <div
-                  className={`h-3 rounded-full transition-all ${
-                    usage.is_exceeded
-                      ? 'bg-red-600'
-                      : usage.percent_used > 80
-                      ? 'bg-orange-500'
-                      : 'bg-green-600'
-                  }`}
-                  style={{
-                    width: `${Math.min(100, usage.percent_used)}%`,
-                  }}
-                ></div>
-              </div>
+              <p className="text-sm text-white/80 mt-2">الوقت المتبقي</p>
             </div>
-
-            {usage.remaining !== null && (
-              <p className="text-sm text-zinc-700 mb-4">
-                متبقي: {usage.remaining.toLocaleString('ar-EG')} طلب
-              </p>
-            )}
-
-            {usage.percent_used > 80 && !usage.is_exceeded && (
-              <div className="flex items-start gap-2 p-3 bg-orange-50 rounded-lg">
-                <AlertTriangle className="h-5 w-5 text-orange-600 flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-sm font-medium text-orange-950">تحذير</p>
-                  <p className="text-xs text-orange-700">
-                    أنت على وشك الوصول إلى حد الطلبات الشهري. قم بالترقية لتجنب الانقطاع.
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {usage.is_exceeded && (
-              <div className="flex items-start gap-2 p-3 bg-red-50 rounded-lg">
-                <AlertTriangle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-sm font-medium text-red-950">تجاوزت الحد</p>
-                  <p className="text-xs text-red-700">
-                    لقد تجاوزت الحد الشهري لعدد الطلبات. قم بالترقية لإضافة المزيد.
-                  </p>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="mb-6">
-        <h2 className="text-xl font-semibold text-zinc-950 mb-4">الخطط المتاحة</h2>
-        {billing.status === 'trial' && (
-          <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <p className="text-sm text-blue-900">
-              <strong>نصيحة:</strong> يمكنك اختيار الخطة المناسبة الآن، وسيتم تفعيلها تلقائياً بعد إتمام عملية الدفع.
-            </p>
           </div>
-        )}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {PLANS.map((plan) => (
+        </div>
+      )}
+
+      {isTrialExpired && !isPendingPayment && (
+        <div className="mb-8 bg-gradient-to-r from-red-500 to-rose-500 rounded-2xl p-6 text-white shadow-lg">
+          <div className="flex items-center gap-4">
+            <div className="bg-white/20 p-3 rounded-xl">
+              <AlertTriangle className="h-8 w-8" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-xl font-bold">انتهت التجربة المجانية</h3>
+              <p className="text-white/90">اشترك الآن للاستمرار في استخدام النظام</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isPendingPayment && (
+        <div className="mb-8 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-2xl p-6 text-white shadow-lg">
+          <div className="flex items-center gap-4">
+            <div className="bg-white/20 p-3 rounded-xl">
+              <Clock className="h-8 w-8" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-xl font-bold">في انتظار تأكيد الدفع</h3>
+              <p className="text-white/90">سيتم تفعيل حسابك خلال 24 ساعة بعد التحقق من الدفع</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {hasDiscount && (
+        <div className="mb-8 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-2xl p-6 text-white shadow-lg">
+          <div className="flex items-center gap-4">
+            <div className="bg-white/20 p-3 rounded-xl">
+              <Percent className="h-8 w-8" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-xl font-bold">خصم 50% لمتاجرك الإضافية!</h3>
+              <p className="text-white/90">كونك تملك أكثر من متجر، تحصل على خصم خاص على جميع الخطط</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+        {PLANS.map((plan) => {
+          const { original, final } = getPrice(plan);
+          const isCurrentPlan = billing?.plan === plan.key;
+          const isPro = plan.popular;
+
+          return (
             <Card
               key={plan.key}
-              className={`relative ${
-                plan.recommended ? 'ring-2 ring-blue-600' : ''
-              } ${billing.plan === plan.key ? 'bg-blue-50' : ''}`}
+              className={`relative overflow-hidden transition-all duration-300 hover:shadow-xl ${
+                isPro ? 'ring-2 ring-emerald-500 scale-105' : ''
+              } ${isCurrentPlan ? 'bg-emerald-50' : ''}`}
             >
-              {plan.recommended && (
-                <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                  <Badge variant="primary" className="px-3 py-1">
-                    الأكثر شعبية
-                  </Badge>
+              {isPro && (
+                <div className="absolute top-0 left-0 right-0 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-center py-2 text-sm font-semibold">
+                  الأكثر شعبية
                 </div>
               )}
-              <CardContent>
+              <CardContent className={isPro ? 'pt-12' : ''}>
                 <div className="text-center mb-6">
-                  <h3 className="text-xl font-bold text-zinc-950 mb-2">{plan.name}</h3>
-                  <div className="flex items-baseline justify-center gap-1">
-                    <span className="text-3xl font-bold text-zinc-950">${plan.price}</span>
-                    <span className="text-sm text-zinc-600">مدى الحياة</span>
+                  <div className={`inline-flex p-4 rounded-2xl mb-4 ${
+                    isPro ? 'bg-emerald-100 text-emerald-600' : 'bg-zinc-100 text-zinc-600'
+                  }`}>
+                    {PLAN_ICONS[plan.key]}
                   </div>
+                  <h3 className="text-xl font-bold text-zinc-900 mb-1">{plan.nameAr}</h3>
+                  <p className="text-sm text-zinc-500">{plan.name}</p>
                 </div>
 
-                <div className="space-y-3 mb-6">
-                  {plan.features.map((feature, index) => (
-                    <div key={index} className="flex items-start gap-2 text-sm text-zinc-700">
-                      <Check className="h-4 w-4 text-green-600 flex-shrink-0 mt-0.5" />
-                      <span>{feature}</span>
+                <div className="text-center mb-6">
+                  {hasDiscount && (
+                    <div className="text-zinc-400 line-through text-lg mb-1">${original}</div>
+                  )}
+                  <div className="flex items-baseline justify-center gap-1">
+                    <span className={`text-4xl font-bold ${isPro ? 'text-emerald-600' : 'text-zinc-900'}`}>
+                      ${final}
+                    </span>
+                    <span className="text-zinc-500 text-sm">/ مدى الحياة</span>
+                  </div>
+                  {hasDiscount && (
+                    <Badge variant="success" className="mt-2">وفر ${original - final}</Badge>
+                  )}
+                </div>
+
+                <div className="space-y-3 mb-8">
+                  {plan.featuresAr.map((feature, index) => (
+                    <div key={index} className="flex items-start gap-3">
+                      <Check className={`h-5 w-5 flex-shrink-0 mt-0.5 ${
+                        isPro ? 'text-emerald-500' : 'text-zinc-400'
+                      }`} />
+                      <span className="text-sm text-zinc-700">{feature}</span>
                     </div>
                   ))}
                 </div>
 
-                {canManage && billing.plan !== plan.key && (
-                  <Button
-                    variant={plan.recommended ? 'primary' : 'outline'}
-                    onClick={() => {
-                      setSelectedPlan(plan.key);
-                      setIsChangePlanModalOpen(true);
-                    }}
-                    className="w-full"
-                  >
-                    اختيار الخطة
-                  </Button>
+                {canManage && !isCurrentPlan && (
+                  <div className="space-y-3">
+                    <Button
+                      variant="primary"
+                      className={`w-full ${
+                        isPro
+                          ? 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600'
+                          : ''
+                      }`}
+                      onClick={() => handleOpenManualPayment(plan)}
+                    >
+                      <CreditCard className="h-4 w-4 ml-2" />
+                      اشترك الآن
+                    </Button>
+                    <button
+                      onClick={() => handleOpenManualPayment(plan)}
+                      className="w-full text-sm text-zinc-500 hover:text-emerald-600 flex items-center justify-center gap-2 py-2"
+                    >
+                      <MessageCircle className="h-4 w-4" />
+                      تحويل بنكي / واتساب
+                    </button>
+                  </div>
                 )}
 
-                {billing.plan === plan.key && (
-                  <div className="text-center py-2 text-sm font-medium text-blue-600">
-                    الخطة الحالية
+                {isCurrentPlan && (
+                  <div className="text-center py-3 bg-emerald-100 rounded-xl">
+                    <span className="text-emerald-700 font-semibold flex items-center justify-center gap-2">
+                      <CheckCircle className="h-5 w-5" />
+                      خطتك الحالية
+                    </span>
                   </div>
                 )}
               </CardContent>
             </Card>
-          ))}
-        </div>
+          );
+        })}
       </div>
 
-      {!isTrialActive && (
-        <Card className="bg-blue-50">
+      {usage && (
+        <Card className="mb-8">
           <CardContent>
-            <div className="flex items-start gap-3">
-              <div className="bg-blue-100 p-2 rounded-lg">
-                <AlertTriangle className="h-5 w-5 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-blue-950 mb-1">ملاحظة مهمة</p>
-                <p className="text-sm text-blue-800">
-                  الدفع يتم يدويًا حاليًا. بعد اختيار الخطة والدفع، سيتم تفعيل اشتراكك من الإدارة. يرجى التواصل معنا لإتمام عملية الدفع.
-                </p>
-              </div>
+            <h3 className="text-lg font-semibold text-zinc-900 mb-4">استخدامك هذا الشهر</h3>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm text-zinc-600">
+                {usage.current_month_count.toLocaleString('ar-EG')} /{' '}
+                {usage.limit !== null ? usage.limit.toLocaleString('ar-EG') : 'غير محدود'} طلب
+              </span>
+              <span className="text-sm font-medium text-zinc-900">
+                {usage.limit !== null ? `${Math.round(usage.percent_used)}%` : '-'}
+              </span>
+            </div>
+            <div className="w-full bg-zinc-200 rounded-full h-3">
+              <div
+                className={`h-3 rounded-full transition-all ${
+                  usage.is_exceeded
+                    ? 'bg-red-500'
+                    : usage.percent_used > 80
+                    ? 'bg-amber-500'
+                    : 'bg-emerald-500'
+                }`}
+                style={{ width: `${Math.min(100, usage.percent_used)}%` }}
+              />
             </div>
           </CardContent>
         </Card>
       )}
 
       <Modal
-        isOpen={isActivateModalOpen}
-        onClose={() => setIsActivateModalOpen(false)}
-        title={billing.status === 'trial' ? 'تحويل التجربة إلى اشتراك' : 'تفعيل الاشتراك'}
+        isOpen={isManualPaymentModalOpen}
+        onClose={() => setIsManualPaymentModalOpen(false)}
+        title={paymentSuccess ? 'تم إرسال طلب الاشتراك' : `الاشتراك في ${selectedPlan?.nameAr || ''}`}
       >
-        <div className="space-y-4">
-          <p className="text-zinc-700">
-            {billing.status === 'trial'
-              ? 'سيتم تحويل حسابك من التجربة المجانية إلى اشتراك نشط. تأكد من أن الدفع قد تم بنجاح.'
-              : 'هل أنت متأكد من تفعيل الاشتراك؟ تأكد من أن الدفع قد تم بنجاح.'}
-          </p>
-          <div className="flex justify-end gap-2 pt-4 border-t border-zinc-200">
-            <Button variant="outline" onClick={() => setIsActivateModalOpen(false)}>
-              إلغاء
-            </Button>
-            <Button variant="primary" onClick={handleActivate} disabled={isProcessing}>
-              {isProcessing ? 'جاري التفعيل...' : 'تفعيل الاشتراك'}
+        {paymentSuccess ? (
+          <div className="text-center py-8">
+            <div className="inline-flex p-4 bg-emerald-100 rounded-full mb-4">
+              <CheckCircle className="h-12 w-12 text-emerald-600" />
+            </div>
+            <h3 className="text-xl font-bold text-zinc-900 mb-2">شكراً لك!</h3>
+            <p className="text-zinc-600 mb-6">
+              تم استلام طلبك وسيتم تفعيل حسابك خلال 24 ساعة بعد التحقق من الدفع.
+            </p>
+            <Button variant="primary" onClick={() => setIsManualPaymentModalOpen(false)}>
+              حسناً
             </Button>
           </div>
-        </div>
-      </Modal>
-
-      <Modal
-        isOpen={isDeactivateModalOpen}
-        onClose={() => setIsDeactivateModalOpen(false)}
-        title="إلغاء التفعيل"
-      >
-        <div className="space-y-4">
-          <p className="text-zinc-700">
-            هل أنت متأكد من إلغاء تفعيل الاشتراك؟ سيتم إيقاف جميع الخدمات.
-          </p>
-          <div className="flex justify-end gap-2 pt-4 border-t border-zinc-200">
-            <Button variant="outline" onClick={() => setIsDeactivateModalOpen(false)}>
-              إلغاء
-            </Button>
-            <Button variant="primary" onClick={handleDeactivate} disabled={isProcessing}>
-              {isProcessing ? 'جاري الإلغاء...' : 'إلغاء التفعيل'}
-            </Button>
-          </div>
-        </div>
-      </Modal>
-
-      <Modal
-        isOpen={isChangePlanModalOpen}
-        onClose={() => {
-          setIsChangePlanModalOpen(false);
-          setSelectedPlan(null);
-        }}
-        title="تغيير الخطة"
-      >
-        <div className="space-y-4">
-          {selectedPlan && (
-            <>
-              <p className="text-zinc-700">
-                هل تريد تغيير الخطة إلى{' '}
-                <span className="font-semibold">
-                  {PLANS.find((p) => p.key === selectedPlan)?.name}
-                </span>
-                ؟
-              </p>
-              <div className="p-4 bg-zinc-50 rounded-lg">
-                <p className="text-sm text-zinc-600 mb-2">تفاصيل الخطة الجديدة:</p>
-                <ul className="space-y-1">
-                  {PLANS.find((p) => p.key === selectedPlan)?.features.map((feature, index) => (
-                    <li key={index} className="text-sm text-zinc-700 flex items-center gap-2">
-                      <Check className="h-4 w-4 text-green-600 flex-shrink-0" />
-                      {feature}
-                    </li>
-                  ))}
-                </ul>
+        ) : (
+          <div className="space-y-6">
+            {selectedPlan && (
+              <div className="bg-zinc-50 rounded-xl p-4">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-zinc-600">الخطة</span>
+                  <span className="font-semibold">{selectedPlan.nameAr}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-zinc-600">المبلغ</span>
+                  <span className="text-2xl font-bold text-emerald-600">
+                    ${hasDiscount ? BillingService.getDiscountedPrice(selectedPlan.price) : selectedPlan.price}
+                  </span>
+                </div>
               </div>
-            </>
-          )}
-          <div className="flex justify-end gap-2 pt-4 border-t border-zinc-200">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setIsChangePlanModalOpen(false);
-                setSelectedPlan(null);
-              }}
+            )}
+
+            <div className="border-t border-zinc-200 pt-6">
+              <h4 className="font-semibold text-zinc-900 mb-4">بيانات التحويل البنكي</h4>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center p-3 bg-zinc-50 rounded-lg">
+                  <div>
+                    <span className="text-xs text-zinc-500 block">البنك</span>
+                    <span className="font-medium">{BANK_DETAILS.bankName}</span>
+                  </div>
+                  <button
+                    onClick={() => handleCopy(BANK_DETAILS.bankName, 'bank')}
+                    className="p-2 hover:bg-zinc-200 rounded-lg transition-colors"
+                  >
+                    {copiedField === 'bank' ? (
+                      <CheckCircle className="h-4 w-4 text-emerald-600" />
+                    ) : (
+                      <Copy className="h-4 w-4 text-zinc-400" />
+                    )}
+                  </button>
+                </div>
+                <div className="flex justify-between items-center p-3 bg-zinc-50 rounded-lg">
+                  <div>
+                    <span className="text-xs text-zinc-500 block">اسم الحساب</span>
+                    <span className="font-medium">{BANK_DETAILS.accountName}</span>
+                  </div>
+                  <button
+                    onClick={() => handleCopy(BANK_DETAILS.accountName, 'name')}
+                    className="p-2 hover:bg-zinc-200 rounded-lg transition-colors"
+                  >
+                    {copiedField === 'name' ? (
+                      <CheckCircle className="h-4 w-4 text-emerald-600" />
+                    ) : (
+                      <Copy className="h-4 w-4 text-zinc-400" />
+                    )}
+                  </button>
+                </div>
+                <div className="flex justify-between items-center p-3 bg-zinc-50 rounded-lg">
+                  <div>
+                    <span className="text-xs text-zinc-500 block">IBAN</span>
+                    <span className="font-medium font-mono text-sm">{BANK_DETAILS.iban}</span>
+                  </div>
+                  <button
+                    onClick={() => handleCopy(BANK_DETAILS.iban, 'iban')}
+                    className="p-2 hover:bg-zinc-200 rounded-lg transition-colors"
+                  >
+                    {copiedField === 'iban' ? (
+                      <CheckCircle className="h-4 w-4 text-emerald-600" />
+                    ) : (
+                      <Copy className="h-4 w-4 text-zinc-400" />
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t border-zinc-200 pt-6">
+              <Button
+                variant="outline"
+                className="w-full mb-4 border-green-500 text-green-600 hover:bg-green-50"
+                onClick={handleWhatsAppClick}
+              >
+                <MessageCircle className="h-5 w-5 ml-2" />
+                إرسال الإيصال عبر واتساب
+              </Button>
+            </div>
+
+            <div className="border-t border-zinc-200 pt-6">
+              <h4 className="font-semibold text-zinc-900 mb-3">أو أدخل رقم الإيصال</h4>
+              <Input
+                value={receiptRef}
+                onChange={(e) => setReceiptRef(e.target.value)}
+                placeholder="رقم الحوالة أو الإيصال"
+                className="mb-4"
+              />
+              <Button
+                variant="primary"
+                className="w-full"
+                onClick={handleSubmitManualPayment}
+                disabled={isProcessing || !receiptRef.trim()}
+              >
+                {isProcessing ? 'جاري الإرسال...' : 'لقد قمت بالدفع'}
+              </Button>
+            </div>
+
+            <button
+              onClick={() => setIsManualPaymentModalOpen(false)}
+              className="w-full text-center text-sm text-zinc-500 hover:text-zinc-700 py-2"
             >
               إلغاء
-            </Button>
-            <Button variant="primary" onClick={handleChangePlan} disabled={isProcessing}>
-              {isProcessing ? 'جاري التغيير...' : 'تأكيد التغيير'}
-            </Button>
+            </button>
           </div>
-        </div>
+        )}
       </Modal>
-    </>
+    </div>
   );
 }
