@@ -1,14 +1,16 @@
 import { useState, useRef } from 'react';
 import { Modal, Button } from '@/components/ui';
-import { Upload, AlertCircle, CheckCircle } from 'lucide-react';
+import { Upload, AlertCircle, CheckCircle, Download } from 'lucide-react';
 
 interface ImportModalProps {
   isOpen: boolean;
   onClose: () => void;
   onImport: (file: File) => Promise<{ success: number; errors: string[] }>;
+  onDownloadTemplate?: () => void;
+  templateAvailable?: boolean;
 }
 
-export function ImportModal({ isOpen, onClose, onImport }: ImportModalProps) {
+export function ImportModal({ isOpen, onClose, onImport, onDownloadTemplate, templateAvailable = false }: ImportModalProps) {
   const [file, setFile] = useState<File | null>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [result, setResult] = useState<{ success: number; errors: string[] } | null>(null);
@@ -51,6 +53,31 @@ export function ImportModal({ isOpen, onClose, onImport }: ImportModalProps) {
   return (
     <Modal isOpen={isOpen} onClose={handleClose} title="استيراد من CSV">
       <div className="space-y-4">
+        {templateAvailable && onDownloadTemplate && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-blue-950 mb-2">
+                  استخدم القالب الرسمي
+                </p>
+                <p className="text-xs text-blue-700 mb-3">
+                  لضمان نجاح الاستيراد، يجب استخدام القالب الرسمي الذي يحتوي على الأعمدة المطلوبة بالترتيب الصحيح
+                </p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={onDownloadTemplate}
+                  type="button"
+                >
+                  <Download className="ml-2 h-4 w-4" />
+                  تحميل القالب
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="border-2 border-dashed border-zinc-300 rounded-lg p-6 text-center">
           <Upload className="h-12 w-12 mx-auto text-zinc-400 mb-3" />
           <p className="text-sm text-zinc-600 mb-2">اختر ملف CSV للاستيراد</p>

@@ -1,4 +1,3 @@
-import { useRef } from 'react';
 import { Button, Card, CardContent, Input } from '@/components/ui';
 import { Search, Filter, Download, Upload } from 'lucide-react';
 
@@ -7,7 +6,7 @@ interface OrdersToolbarProps {
   onSearchChange: (value: string) => void;
   onFiltersClick: () => void;
   onExportCsv: () => void;
-  onImportCsv: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  onImportCsv: () => void;
 }
 
 export function OrdersToolbar({
@@ -17,7 +16,6 @@ export function OrdersToolbar({
   onExportCsv,
   onImportCsv,
 }: OrdersToolbarProps) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   return (
     <>
@@ -42,10 +40,7 @@ export function OrdersToolbar({
                 <Download className="ml-2 h-4 w-4" />
                 تصدير
               </Button>
-              <Button
-                variant="outline"
-                onClick={() => fileInputRef.current?.click()}
-              >
+              <Button variant="outline" onClick={onImportCsv}>
                 <Upload className="ml-2 h-4 w-4" />
                 استيراد
               </Button>
@@ -53,14 +48,6 @@ export function OrdersToolbar({
           </div>
         </CardContent>
       </Card>
-
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".csv"
-        onChange={onImportCsv}
-        className="hidden"
-      />
     </>
   );
 }

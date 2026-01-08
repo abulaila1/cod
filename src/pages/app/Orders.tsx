@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { PageHeader } from '@/components/common/PageHeader';
-import { Button, Card, CardContent, Modal } from '@/components/ui';
+import { Button, Card, CardContent } from '@/components/ui';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { OrdersService } from '@/services/orders.service';
@@ -11,8 +11,10 @@ import { OrdersTable } from '@/components/orders/OrdersTable';
 import { FiltersPanel } from '@/components/orders/FiltersPanel';
 import { BulkActionsBar } from '@/components/orders/BulkActionsBar';
 import { OrderDetailsDrawer } from '@/components/orders/OrderDetailsDrawer';
+import { ImportModal } from '@/components/entity/ImportModal';
 import type { OrderFilters } from '@/types/domain';
-import { Upload, FileText, X } from 'lucide-react';
+import { FileText, X } from 'lucide-react';
+import { generateOrderTemplate, validateOrderHeaders } from '@/utils/order-import';
 
 export function Orders() {
   const { currentBusiness } = useBusiness();
@@ -46,9 +48,6 @@ export function Orders() {
   const [hasAppliedFilters, setHasAppliedFilters] = useState(false);
 
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
-  const [importResult, setImportResult] = useState<{ success: number; errors: string[] } | null>(
-    null
-  );
 
   useEffect(() => {
     const queryFilters: OrderFilters = {};
@@ -102,30 +101,66 @@ export function Orders() {
     }
   };
 
-  const handleImportCsv = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (!currentBusiness || !user || !event.target.files?.[0]) return;
+  const handleDownloadTemplate = () => {
+    const template = generateOrderTemplate();
+    const blob = new Blob([template], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `orders-template-${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
-    const file = event.target.files[0];
-    const reader = new FileReader();
+  const handleImportCsv = async (file: File): Promise<{ success: number; errors: string[] }> => {
+    if (!currentBusiness || !user) {
+      throw new Error('لم يتم تحديد وورك سبيس أو المستخدم');
+    }
 
-    reader.onload = async (e) => {
-      try {
-        const csvContent = e.target?.result as string;
-        const result = await OrdersService.importOrdersCsv(
-          currentBusiness.id,
-          user.id,
-          csvContent
-        );
-        setImportResult(result);
-        setIsImportModalOpen(true);
-        loadOrders();
-      } catch (error: any) {
-        alert(error.message || 'فشل استيراد الملف');
-      }
-    };
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
 
-    reader.readAsText(file);
-    event.target.value = '';
+      reader.onload = async (e) => {
+        try {
+          const csvContent = e.target?.result as string;
+          const lines = csvContent.split('\n').filter((line) => line.trim());
+
+          if (lines.length < 2) {
+            reject(new Error('ملف CSV فارغ أو غير صحيح'));
+            return;
+          }
+
+          const headers = lines[0].split(',').map((h) => h.trim().replace(/^"|"$/g, ''));
+          const validation = validateOrderHeaders(headers);
+
+          if (!validation.valid) {
+            reject(
+              new Error(
+                `تنسيق الملف غير صحيح. يرجى استخدام القالب الرسمي.\n\nالأعمدة المفقودة: ${validation.missing.join(', ')}`
+              )
+            );
+            return;
+          }
+
+          const result = await OrdersService.importOrdersCsv(
+            currentBusiness.id,
+            user.id,
+            csvContent
+          );
+
+          loadOrders();
+          resolve(result);
+        } catch (error: any) {
+          reject(error);
+        }
+      };
+
+      reader.onerror = () => {
+        reject(new Error('فشل قراءة الملف'));
+      };
+
+      reader.readAsText(file);
+    });
   };
 
   const handleBulkUpdateStatus = async (statusId: string) => {
@@ -216,7 +251,7 @@ export function Orders() {
         onSearchChange={setSearchTerm}
         onFiltersClick={() => setIsFiltersOpen(true)}
         onExportCsv={handleExportCsv}
-        onImportCsv={handleImportCsv}
+        onImportCsv={() => setIsImportModalOpen(true)}
       />
 
       {isLoading ? (
@@ -296,36 +331,13 @@ export function Orders() {
         />
       )}
 
-      <Modal
+      <ImportModal
         isOpen={isImportModalOpen}
         onClose={() => setIsImportModalOpen(false)}
-        title="نتيجة الاستيراد"
-      >
-        {importResult && (
-          <div className="space-y-4">
-            <p className="text-sm text-zinc-600">
-              تم استيراد {importResult.success} طلب بنجاح
-            </p>
-
-            {importResult.errors.length > 0 && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                <h4 className="text-sm font-medium text-red-900 mb-2">
-                  أخطاء ({importResult.errors.length})
-                </h4>
-                <ul className="text-xs text-red-700 space-y-1 max-h-48 overflow-y-auto">
-                  {importResult.errors.map((error, i) => (
-                    <li key={i}>{error}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            <Button onClick={() => setIsImportModalOpen(false)} variant="primary">
-              إغلاق
-            </Button>
-          </div>
-        )}
-      </Modal>
+        onImport={handleImportCsv}
+        onDownloadTemplate={handleDownloadTemplate}
+        templateAvailable={true}
+      />
     </>
   );
 }

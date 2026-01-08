@@ -378,7 +378,7 @@ export class OrdersService {
       throw new Error('ملف CSV فارغ أو غير صحيح');
     }
 
-    const headers = lines[0].split(',').map((h) => h.trim().replace(/^"|"$/g, ''));
+    const headers = lines[0].split(',').map((h) => h.trim().replace(/^"|"$/g, '').toLowerCase());
     const dataLines = lines.slice(1);
 
     await this.ensureCanAddOrders(businessId, dataLines.length);
@@ -388,35 +388,65 @@ export class OrdersService {
 
     for (let i = 0; i < dataLines.length; i++) {
       try {
-        const values = dataLines[i].split(',').map((v) => v.trim().replace(/^"|"$/g, ''));
+        const values = this.parseCSVLine(dataLines[i]);
 
         const orderData: any = {
           business_id: businessId,
+          order_date: new Date().toISOString().split('T')[0],
+          revenue: 0,
+          cogs: 0,
+          shipping_cost: 0,
         };
+
+        let customerName = '';
+        let phoneNumber = '';
+        let governorate = '';
+        let cityAddress = '';
+        let productName = '';
+        let quantity = 1;
+        let price = 0;
+        let notes = '';
 
         for (let j = 0; j < headers.length; j++) {
           const header = headers[j];
-          const value = values[j];
+          const value = values[j]?.trim() || '';
 
-          if (header === 'التاريخ' || header === 'order_date') {
-            orderData.order_date = value;
-          } else if (header === 'الإيراد' || header === 'revenue') {
-            orderData.revenue = parseFloat(value) || 0;
-          } else if (header === 'التكلفة' || header === 'cogs') {
-            orderData.cogs = parseFloat(value) || 0;
-          } else if (header === 'الشحن' || header === 'shipping_cost') {
-            orderData.shipping_cost = parseFloat(value) || 0;
-          } else if (header === 'الإعلانات' || header === 'ad_cost') {
-            orderData.ad_cost = parseFloat(value) || 0;
-          } else if (header === 'ملاحظات' || header === 'notes') {
-            orderData.notes = value;
+          if (header === 'customer name') {
+            customerName = value;
+          } else if (header === 'phone number') {
+            phoneNumber = value;
+          } else if (header === 'governorate') {
+            governorate = value;
+          } else if (header === 'city/address') {
+            cityAddress = value;
+          } else if (header === 'product name') {
+            productName = value;
+          } else if (header === 'quantity') {
+            quantity = parseInt(value) || 1;
+          } else if (header === 'price') {
+            price = parseFloat(value) || 0;
+          } else if (header === 'notes') {
+            notes = value;
           }
         }
 
-        if (!orderData.order_date) {
-          errors.push(`الصف ${i + 2}: تاريخ الطلب مطلوب`);
+        if (!customerName || !phoneNumber) {
+          errors.push(`الصف ${i + 2}: اسم العميل ورقم الهاتف مطلوبان`);
           continue;
         }
+
+        orderData.revenue = price * quantity;
+        orderData.notes = [
+          `العميل: ${customerName}`,
+          `الهاتف: ${phoneNumber}`,
+          `المحافظة: ${governorate}`,
+          `العنوان: ${cityAddress}`,
+          `المنتج: ${productName}`,
+          `الكمية: ${quantity}`,
+          notes ? `ملاحظات: ${notes}` : '',
+        ]
+          .filter(Boolean)
+          .join(' | ');
 
         const { error } = await supabase.from('orders').insert(orderData);
 
@@ -431,6 +461,33 @@ export class OrdersService {
     }
 
     return { success, errors };
+  }
+
+  private static parseCSVLine(line: string): string[] {
+    const result: string[] = [];
+    let current = '';
+    let inQuotes = false;
+
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+
+      if (char === '"') {
+        if (inQuotes && line[i + 1] === '"') {
+          current += '"';
+          i++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (char === ',' && !inQuotes) {
+        result.push(current);
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+
+    result.push(current);
+    return result;
   }
 
   static async createOrderMinimal(
