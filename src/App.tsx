@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ToastProvider } from '@/components/ui';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { BusinessProvider } from '@/contexts/BusinessContext';
+import { SuperAdminProvider } from '@/contexts/SuperAdminContext';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { OnboardingRoute } from '@/components/auth/OnboardingRoute';
 import { GlobalErrorBoundary } from '@/components/common/GlobalError';
@@ -35,6 +36,7 @@ import { Billing } from '@/pages/app/Billing';
 
 import { InviteAcceptance } from '@/pages/public/InviteAcceptance';
 import { NotFound } from '@/pages/NotFound';
+import SuperDashboard from '@/pages/admin/SuperDashboard';
 
 import { ConfigurationError } from '@/components/common/ConfigurationError';
 import { isSupabaseConfigured } from '@/services/supabase';
@@ -48,9 +50,10 @@ function App() {
     <GlobalErrorBoundary>
       <BrowserRouter>
         <AuthProvider>
-          <BusinessProvider>
-            <ToastProvider>
-              <Routes>
+          <SuperAdminProvider>
+            <BusinessProvider>
+              <ToastProvider>
+                <Routes>
                 <Route path="/" element={<Home />} />
 
                 <Route path="/auth/login" element={<Login />} />
@@ -97,10 +100,20 @@ function App() {
                   <Route path="settings/employees" element={<EmployeesManagement />} />
                 </Route>
 
+                <Route
+                  path="/admin/super"
+                  element={
+                    <ProtectedRoute>
+                      <SuperDashboard />
+                    </ProtectedRoute>
+                  }
+                />
+
                 <Route path="*" element={<NotFound />} />
-              </Routes>
-            </ToastProvider>
-          </BusinessProvider>
+                </Routes>
+              </ToastProvider>
+            </BusinessProvider>
+          </SuperAdminProvider>
         </AuthProvider>
       </BrowserRouter>
     </GlobalErrorBoundary>
