@@ -1,593 +1,202 @@
-import { useState, useEffect } from 'react';
+import React, { useMemo } from 'react';
 import {
-  AreaChart,
-  Area,
-  PieChart,
-  Pie,
-  Cell,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-  CartesianGrid,
+  AreaChart, Area, PieChart, Pie, Cell,
+  ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid, Legend
 } from 'recharts';
-import clsx from 'clsx';
-import { Card, DateRangePicker, Select } from '@/components/ui';
-import { useBusiness } from '@/contexts/BusinessContext';
-import { MetricsService, type MetricsFilters, type KPIs, type TimeSeriesDataPoint } from '@/domain/metrics';
-import { EntitiesService } from '@/services';
-import type { Country, Carrier, Employee, ProductBreakdown, CountryBreakdown } from '@/types/domain';
 import {
-  TrendingUp,
-  TrendingDown,
-  DollarSign,
-  CheckCircle,
-  ShoppingCart,
-  AlertTriangle,
-  Calendar,
+  TrendingUp, TrendingDown, Package,
+  Truck, AlertCircle, DollarSign, RefreshCw
 } from 'lucide-react';
+import { useOrdersList } from '@/hooks/useOrdersList';
+import { useBusiness } from '@/contexts/BusinessContext';
+import { Card } from '@/components/ui/Card';
+import { Skeleton } from '@/components/common/Skeleton';
 
-const STATUS_COLORS: Record<string, string> = {
-  delivered: '#10b981',
-  pending: '#f59e0b',
-  canceled: '#ef4444',
-  rto: '#dc2626',
-  out_for_delivery: '#3b82f6',
-  default: '#6b7280',
-};
+function formatCurrency(amount: number, currency: string = 'EGP'): string {
+  return new Intl.NumberFormat('ar-EG', {
+    style: 'decimal',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(amount);
+}
 
 export function Dashboard() {
   const { currentBusiness } = useBusiness();
-  const [isLoading, setIsLoading] = useState(true);
-  const [kpis, setKpis] = useState<KPIs | null>(null);
-  const [timeSeries, setTimeSeries] = useState<TimeSeriesDataPoint[]>([]);
-  const [statusDistribution, setStatusDistribution] = useState<any[]>([]);
-  const [topProducts, setTopProducts] = useState<ProductBreakdown[]>([]);
-  const [topCountries, setTopCountries] = useState<CountryBreakdown[]>([]);
+  const { orders, isLoading } = useOrdersList();
 
-  const [countries, setCountries] = useState<Country[]>([]);
-  const [carriers, setCarriers] = useState<Carrier[]>([]);
-  const [employees, setEmployees] = useState<Employee[]>([]);
+  // --- 1. Calculate Metrics ---
+  const metrics = useMemo(() => {
+    if (!orders.length) return null;
 
-  const sevenDaysAgo = new Date();
-  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const totalOrders = orders.length;
+    const delivered = orders.filter(o => o.status === 'delivered').length;
+    const returned = orders.filter(o => o.status === 'returned').length;
+    const totalRevenue = orders.reduce((sum, o) => sum + (o.total_amount || 0), 0);
+    // Approximate profit (assuming 30% margin if cost not set - placeholder logic)
+    const netProfit = orders.reduce((sum, o) => sum + ((o.total_amount || 0) - (o.shipping_cost || 0) - (o.products?.cost_price || 0)), 0);
 
-  const [filters, setFilters] = useState<MetricsFilters>({
-    date_from: sevenDaysAgo.toISOString().split('T')[0],
-    date_to: new Date().toISOString().split('T')[0],
-    include_ad_cost: true,
-    delivered_denominator: 'delivered',
-  });
+    const deliveryRate = totalOrders ? Math.round((delivered / totalOrders) * 100) : 0;
+    const returnRate = totalOrders ? Math.round((returned / totalOrders) * 100) : 0;
 
-  useEffect(() => {
-    if (currentBusiness) {
-      loadData();
-      loadFiltersOptions();
-    }
-  }, [currentBusiness]);
+    return { totalOrders, totalRevenue, netProfit, deliveryRate, returnRate };
+  }, [orders]);
 
-  useEffect(() => {
-    if (currentBusiness) {
-      loadData();
-    }
-  }, [filters, currentBusiness]);
+  // --- 2. Prepare Chart Data ---
+  const chartData = useMemo(() => {
+    if (!orders.length) return [];
+    // Group by Date (Simple implementation)
+    const grouped = orders.reduce((acc, order) => {
+      const date = new Date(order.created_at).toLocaleDateString('en-GB'); // DD/MM/YYYY
+      if (!acc[date]) acc[date] = { date, sales: 0, profit: 0 };
+      acc[date].sales += order.total_amount || 0;
+      acc[date].profit += ((order.total_amount || 0) - (order.shipping_cost || 0));
+      return acc;
+    }, {} as Record<string, any>);
+    return Object.values(grouped).slice(-7); // Last 7 days
+  }, [orders]);
 
-  const loadData = async () => {
-    if (!currentBusiness) return;
+  const statusData = useMemo(() => {
+    const statuses = { delivered: 0, returned: 0, pending: 0, shipping: 0 };
+    orders.forEach(o => {
+      if (o.status === 'delivered') statuses.delivered++;
+      else if (o.status === 'returned') statuses.returned++;
+      else if (o.status === 'pending') statuses.pending++;
+      else statuses.shipping++;
+    });
+    return [
+      { name: 'تم التسليم', value: statuses.delivered, color: '#10B981' }, // Emerald
+      { name: 'مرتجع', value: statuses.returned, color: '#EF4444' },     // Red
+      { name: 'قيد الشحن', value: statuses.shipping, color: '#3B82F6' }, // Blue
+      { name: 'معلق', value: statuses.pending, color: '#F59E0B' },       // Amber
+    ].filter(d => d.value > 0);
+  }, [orders]);
 
-    try {
-      setIsLoading(true);
-      const [kpisData, timeSeriesData, statusData, breakdowns] = await Promise.all([
-        MetricsService.getKpis(currentBusiness.id, filters),
-        MetricsService.getTimeSeries(currentBusiness.id, filters),
-        MetricsService.getStatusDistribution(currentBusiness.id, filters),
-        MetricsService.getBreakdowns(currentBusiness.id, filters),
-      ]);
-
-      setKpis(kpisData);
-      setTimeSeries(timeSeriesData);
-      setStatusDistribution(statusData);
-      setTopProducts(breakdowns.by_product.slice(0, 5));
-      setTopCountries(breakdowns.by_country.slice(0, 5));
-    } catch (error) {
-      console.error('Failed to load dashboard data:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const loadFiltersOptions = async () => {
-    if (!currentBusiness) return;
-
-    try {
-      const [countriesData, carriersData, employeesData] = await Promise.all([
-        EntitiesService.getCountries(currentBusiness.id),
-        EntitiesService.getCarriers(currentBusiness.id),
-        EntitiesService.getEmployees(currentBusiness.id),
-      ]);
-
-      setCountries(countriesData);
-      setCarriers(carriersData);
-      setEmployees(employeesData);
-    } catch (error) {
-      console.error('Failed to load filter options:', error);
-    }
-  };
-
-  const formatCurrency = (num: number): string => {
-    return new Intl.NumberFormat('ar-EG', {
-      style: 'decimal',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(num);
-  };
-
-  const formatNumber = (num: number): string => {
-    return new Intl.NumberFormat('ar-EG').format(Math.round(num));
-  };
-
-  const setQuickDateRange = (range: 'today' | 'week' | 'month') => {
-    const end = new Date().toISOString().split('T')[0];
-    let start: string;
-
-    if (range === 'today') {
-      start = end;
-    } else if (range === 'week') {
-      const d = new Date();
-      d.setDate(d.getDate() - 7);
-      start = d.toISOString().split('T')[0];
-    } else {
-      const d = new Date();
-      d.setMonth(d.getMonth() - 1);
-      start = d.toISOString().split('T')[0];
-    }
-
-    setFilters({ ...filters, date_from: start, date_to: end });
-  };
-
-  if (!currentBusiness) {
-    return (
-      <div className="text-center py-12">
-        <p className="text-zinc-600">لم يتم تحديد وورك سبيس</p>
-      </div>
-    );
-  }
-
-  const deliveryRateColor = kpis && kpis.delivery_rate >= 70 ? 'text-emerald-600' : 'text-amber-600';
-  const returnRateColor = kpis && kpis.return_rate <= 20 ? 'text-emerald-600' : 'text-rose-600';
+  if (isLoading) return <div className="p-8"><Skeleton className="h-96 w-full" /></div>;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-start justify-between">
+    <div className="space-y-6 animate-in fade-in duration-500">
+      {/* Header */}
+      <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-zinc-950 mb-1">لوحة التحكم</h1>
-          <p className="text-sm text-zinc-600">نظرة شاملة على أداء عملك</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setQuickDateRange('today')}
-            className="px-3 py-1.5 text-sm font-medium text-zinc-700 bg-white border border-zinc-300 rounded-lg hover:bg-zinc-50 transition-colors"
-          >
-            اليوم
-          </button>
-          <button
-            onClick={() => setQuickDateRange('week')}
-            className="px-3 py-1.5 text-sm font-medium text-zinc-700 bg-white border border-zinc-300 rounded-lg hover:bg-zinc-50 transition-colors"
-          >
-            آخر 7 أيام
-          </button>
-          <button
-            onClick={() => setQuickDateRange('month')}
-            className="px-3 py-1.5 text-sm font-medium text-zinc-700 bg-white border border-zinc-300 rounded-lg hover:bg-zinc-50 transition-colors"
-          >
-            آخر 30 يوم
-          </button>
+          <h1 className="text-2xl font-bold text-gray-900">نظرة عامة</h1>
+          <p className="text-sm text-gray-500">مرحباً بك في {currentBusiness?.name || 'متجرك'}</p>
         </div>
       </div>
 
-      <Card className="bg-gradient-to-br from-slate-50 to-zinc-50 border-zinc-200">
-        <div className="p-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
-              <label className="block text-xs font-medium text-zinc-700 mb-1.5">
-                الفترة الزمنية
-              </label>
-              <DateRangePicker
-                startDate={filters.date_from}
-                endDate={filters.date_to}
-                onStartDateChange={(date) => setFilters({ ...filters, date_from: date })}
-                onEndDateChange={(date) => setFilters({ ...filters, date_to: date })}
-              />
-            </div>
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard
+          title="صافي الربح"
+          value={formatCurrency(metrics?.netProfit || 0, currentBusiness?.currency)}
+          icon={<DollarSign className="w-5 h-5 text-emerald-600" />}
+          trend="up"
+          color="emerald"
+        />
+        <StatCard
+          title="نسبة التسليم"
+          value={`${metrics?.deliveryRate || 0}%`}
+          icon={<Package className="w-5 h-5 text-blue-600" />}
+          trend={metrics?.deliveryRate && metrics.deliveryRate > 50 ? 'up' : 'down'}
+          color="blue"
+        />
+        <StatCard
+          title="إجمالي الطلبات"
+          value={metrics?.totalOrders || 0}
+          icon={<Truck className="w-5 h-5 text-gray-600" />}
+          color="gray"
+        />
+        <StatCard
+          title="نسبة المرتجع"
+          value={`${metrics?.returnRate || 0}%`}
+          icon={<RefreshCw className="w-5 h-5 text-red-600" />}
+          trend={metrics?.returnRate && metrics.returnRate > 20 ? 'down' : 'up'}
+          color="red"
+        />
+      </div>
 
-            <div>
-              <label className="block text-xs font-medium text-zinc-700 mb-1.5">الدولة</label>
-              <Select
-                value={filters.country_id || ''}
-                onChange={(e) =>
-                  setFilters({ ...filters, country_id: e.target.value || undefined })
-                }
-              >
-                <option value="">الكل</option>
-                {countries.map((country) => (
-                  <option key={country.id} value={country.id}>
-                    {country.name_ar}
-                  </option>
-                ))}
-              </Select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-zinc-700 mb-1.5">
-                شركة الشحن
-              </label>
-              <Select
-                value={filters.carrier_id || ''}
-                onChange={(e) =>
-                  setFilters({ ...filters, carrier_id: e.target.value || undefined })
-                }
-              >
-                <option value="">الكل</option>
-                {carriers.map((carrier) => (
-                  <option key={carrier.id} value={carrier.id}>
-                    {carrier.name_ar}
-                  </option>
-                ))}
-              </Select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-zinc-700 mb-1.5">الموظف</label>
-              <Select
-                value={filters.employee_id || ''}
-                onChange={(e) =>
-                  setFilters({ ...filters, employee_id: e.target.value || undefined })
-                }
-              >
-                <option value="">الكل</option>
-                {employees.map((employee) => (
-                  <option key={employee.id} value={employee.id}>
-                    {employee.name_ar}
-                  </option>
-                ))}
-              </Select>
-            </div>
+      {/* Charts Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Main Chart (Sales) */}
+        <div className="lg:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+          <h3 className="text-lg font-semibold mb-6">نمو المبيعات والأرباح</h3>
+          <div className="h-80 w-full" dir="ltr">
+            {chartData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={chartData}>
+                  <defs>
+                    <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.1}/>
+                      <stop offset="95%" stopColor="#3B82F6" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                  <XAxis dataKey="date" fontSize={12} tickLine={false} axisLine={false} />
+                  <YAxis fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => `${v/1000}k`} />
+                  <Tooltip />
+                  <Area type="monotone" dataKey="sales" stroke="#3B82F6" strokeWidth={3} fillOpacity={1} fill="url(#colorSales)" name="المبيعات" />
+                  <Area type="monotone" dataKey="profit" stroke="#10B981" strokeWidth={3} fillOpacity={0} fill="transparent" name="الربح" />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex items-center justify-center text-gray-400">لا توجد بيانات كافية للرسم البياني</div>
+            )}
           </div>
         </div>
-      </Card>
 
-      {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[...Array(4)].map((_, i) => (
-            <Card key={i} className="animate-pulse">
-              <div className="p-6">
-                <div className="h-4 bg-zinc-200 rounded w-24 mb-3"></div>
-                <div className="h-8 bg-zinc-200 rounded w-32"></div>
-              </div>
-            </Card>
-          ))}
-        </div>
-      ) : !kpis ? (
-        <div className="text-center py-12">
-          <p className="text-zinc-600">فشل تحميل البيانات</p>
-        </div>
-      ) : (
-        <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Card className="bg-gradient-to-br from-emerald-50 to-green-50 border-emerald-200 shadow-sm hover:shadow-md transition-shadow">
-              <div className="p-6">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="p-2.5 bg-emerald-100 rounded-xl">
-                    <DollarSign className="h-5 w-5 text-emerald-700" />
-                  </div>
-                  <TrendingUp className="h-4 w-4 text-emerald-600" />
-                </div>
-                <p className="text-xs font-medium text-emerald-900 mb-1">صافي الربح</p>
-                <p className="text-2xl font-bold text-emerald-950">
-                  {formatCurrency(kpis.net_profit)} <span className="text-sm font-normal">ج.م</span>
-                </p>
-              </div>
-            </Card>
-
-            <Card className="bg-gradient-to-br from-blue-50 to-sky-50 border-blue-200 shadow-sm hover:shadow-md transition-shadow">
-              <div className="p-6">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="p-2.5 bg-blue-100 rounded-xl">
-                    <CheckCircle className="h-5 w-5 text-blue-700" />
-                  </div>
-                  <div className={clsx('flex items-center gap-1', deliveryRateColor)}>
-                    <span className="text-xs font-semibold">{kpis.delivery_rate.toFixed(1)}%</span>
-                  </div>
-                </div>
-                <p className="text-xs font-medium text-blue-900 mb-1">نسبة التسليم</p>
-                <p className="text-2xl font-bold text-blue-950">
-                  {formatNumber(kpis.delivered_orders)} <span className="text-sm font-normal">طلب</span>
-                </p>
-              </div>
-            </Card>
-
-            <Card className="bg-gradient-to-br from-violet-50 to-purple-50 border-violet-200 shadow-sm hover:shadow-md transition-shadow">
-              <div className="p-6">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="p-2.5 bg-violet-100 rounded-xl">
-                    <ShoppingCart className="h-5 w-5 text-violet-700" />
-                  </div>
-                  <Calendar className="h-4 w-4 text-violet-600" />
-                </div>
-                <p className="text-xs font-medium text-violet-900 mb-1">إجمالي الطلبات</p>
-                <p className="text-2xl font-bold text-violet-950">{formatNumber(kpis.total_orders)}</p>
-              </div>
-            </Card>
-
-            <Card className="bg-gradient-to-br from-rose-50 to-red-50 border-rose-200 shadow-sm hover:shadow-md transition-shadow">
-              <div className="p-6">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="p-2.5 bg-rose-100 rounded-xl">
-                    <AlertTriangle className="h-5 w-5 text-rose-700" />
-                  </div>
-                  <div className={clsx('flex items-center gap-1', returnRateColor)}>
-                    <span className="text-xs font-semibold">{kpis.return_rate.toFixed(1)}%</span>
-                  </div>
-                </div>
-                <p className="text-xs font-medium text-rose-900 mb-1">نسبة المرتجع</p>
-                <p className="text-2xl font-bold text-rose-950">
-                  {formatNumber(kpis.return_orders)} <span className="text-sm font-normal">طلب</span>
-                </p>
-              </div>
-            </Card>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <Card className="lg:col-span-2 shadow-sm">
-              <div className="p-5 border-b border-zinc-200">
-                <h3 className="text-sm font-bold text-zinc-950">المبيعات والأرباح</h3>
-                <p className="text-xs text-zinc-500 mt-0.5">تطور الإيرادات والربح الصافي</p>
-              </div>
-              <div className="p-5">
-                {timeSeries.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={280}>
-                    <AreaChart data={timeSeries}>
-                      <defs>
-                        <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-                          <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                        </linearGradient>
-                        <linearGradient id="colorProfit" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                          <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                      <XAxis
-                        dataKey="date"
-                        stroke="#6b7280"
-                        fontSize={11}
-                        tickFormatter={(date) => {
-                          const d = new Date(date);
-                          return `${d.getDate()}/${d.getMonth() + 1}`;
-                        }}
-                      />
-                      <YAxis stroke="#6b7280" fontSize={11} />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: '#ffffff',
-                          border: '1px solid #e5e7eb',
-                          borderRadius: '8px',
-                          fontSize: '12px',
-                        }}
-                        formatter={(value: number) => formatCurrency(value)}
-                        labelFormatter={(date) => new Date(date).toLocaleDateString('ar-EG')}
-                      />
-                      <Area
-                        type="monotone"
-                        dataKey="gross_sales"
-                        stroke="#3b82f6"
-                        strokeWidth={2}
-                        fillOpacity={1}
-                        fill="url(#colorRevenue)"
-                        name="المبيعات"
-                      />
-                      <Area
-                        type="monotone"
-                        dataKey="net_profit"
-                        stroke="#10b981"
-                        strokeWidth={2}
-                        fillOpacity={1}
-                        fill="url(#colorProfit)"
-                        name="الربح الصافي"
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="h-[280px] flex items-center justify-center text-sm text-zinc-500">
-                    لا توجد بيانات لعرض الرسم البياني
-                  </div>
-                )}
-              </div>
-            </Card>
-
-            <Card className="shadow-sm">
-              <div className="p-5 border-b border-zinc-200">
-                <h3 className="text-sm font-bold text-zinc-950">توزيع حالات الطلبات</h3>
-                <p className="text-xs text-zinc-500 mt-0.5">نسبة الطلبات حسب الحالة</p>
-              </div>
-              <div className="p-5">
-                {statusDistribution.length > 0 ? (
-                  <>
-                    <ResponsiveContainer width="100%" height={200}>
-                      <PieChart>
-                        <Pie
-                          data={statusDistribution}
-                          dataKey="count"
-                          nameKey="label_ar"
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={50}
-                          outerRadius={80}
-                          paddingAngle={2}
-                        >
-                          {statusDistribution.map((entry, index) => (
-                            <Cell
-                              key={`cell-${index}`}
-                              fill={STATUS_COLORS[entry.status_key] || STATUS_COLORS.default}
-                            />
-                          ))}
-                        </Pie>
-                        <Tooltip
-                          contentStyle={{
-                            backgroundColor: '#ffffff',
-                            border: '1px solid #e5e7eb',
-                            borderRadius: '8px',
-                            fontSize: '12px',
-                          }}
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
-                    <div className="mt-4 space-y-2">
-                      {statusDistribution.map((status) => (
-                        <div key={status.status_key} className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <div
-                              className="w-3 h-3 rounded-full"
-                              style={{
-                                backgroundColor:
-                                  STATUS_COLORS[status.status_key] || STATUS_COLORS.default,
-                              }}
-                            />
-                            <span className="text-xs text-zinc-700">{status.label_ar}</span>
-                          </div>
-                          <span className="text-xs font-semibold text-zinc-950">
-                            {status.percentage.toFixed(1)}%
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </>
-                ) : (
-                  <div className="h-60 flex items-center justify-center text-sm text-zinc-500">
-                    لا توجد بيانات لعرضها
-                  </div>
-                )}
-              </div>
-            </Card>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <Card className="shadow-sm">
-              <div className="p-5 border-b border-zinc-200">
-                <h3 className="text-sm font-bold text-zinc-950">أفضل المنتجات</h3>
-                <p className="text-xs text-zinc-500 mt-0.5">المنتجات الأكثر ربحية</p>
-              </div>
-              <div className="p-5">
-                {topProducts.length > 0 ? (
-                  <div className="space-y-3">
-                    {topProducts.map((product) => (
-                      <div
-                        key={product.product_id}
-                        className="flex items-center justify-between p-3 bg-zinc-50 rounded-lg hover:bg-zinc-100 transition-colors"
-                      >
-                        <div className="flex-1">
-                          <p className="text-sm font-medium text-zinc-950">
-                            {product.name_ar}
-                          </p>
-                          <p className="text-xs text-zinc-500 mt-0.5">
-                            {formatNumber(product.total_items)} قطعة • {formatNumber(product.total_orders)} طلب
-                          </p>
-                        </div>
-                        <div className="text-left">
-                          <p className="text-sm font-bold text-emerald-700">
-                            {formatCurrency(product.profit)} ج.م
-                          </p>
-                          <p className="text-xs text-zinc-500 mt-0.5">
-                            {product.delivery_rate.toFixed(0)}% تسليم
-                          </p>
-                        </div>
-                      </div>
+        {/* Status Chart (Donut) */}
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+          <h3 className="text-lg font-semibold mb-6">توزيع حالات الطلبات</h3>
+          <div className="h-64 w-full" dir="ltr">
+             {statusData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={statusData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={80}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {statusData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
-                  </div>
-                ) : (
-                  <div className="h-40 flex items-center justify-center text-sm text-zinc-500">
-                    لا توجد بيانات
-                  </div>
-                )}
-              </div>
-            </Card>
-
-            <Card className="shadow-sm">
-              <div className="p-5 border-b border-zinc-200">
-                <h3 className="text-sm font-bold text-zinc-950">أفضل المحافظات</h3>
-                <p className="text-xs text-zinc-500 mt-0.5">المحافظات الأعلى في التسليم</p>
-              </div>
-              <div className="p-5">
-                {topCountries.length > 0 ? (
-                  <div className="space-y-3">
-                    {topCountries.map((country) => (
-                      <div key={country.country_id} className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium text-zinc-950">
-                            {country.name_ar}
-                          </span>
-                          <span className="text-sm font-bold text-zinc-950">
-                            {country.delivery_rate.toFixed(1)}%
-                          </span>
-                        </div>
-                        <div className="relative h-2 bg-zinc-200 rounded-full overflow-hidden">
-                          <div
-                            className={clsx(
-                              'absolute top-0 right-0 h-full rounded-full transition-all',
-                              country.delivery_rate >= 70
-                                ? 'bg-emerald-500'
-                                : country.delivery_rate >= 50
-                                ? 'bg-amber-500'
-                                : 'bg-rose-500'
-                            )}
-                            style={{ width: `${country.delivery_rate}%` }}
-                          />
-                        </div>
-                        <div className="flex items-center justify-between text-xs text-zinc-500">
-                          <span>{formatNumber(country.delivered)} / {formatNumber(country.total)} طلب</span>
-                          <span>{formatCurrency(country.net_profit)} ج.م</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="h-40 flex items-center justify-center text-sm text-zinc-500">
-                    لا توجد بيانات
-                  </div>
-                )}
-              </div>
-            </Card>
+                  </Pie>
+                  <Tooltip />
+                  <Legend verticalAlign="bottom" height={36}/>
+                </PieChart>
+              </ResponsiveContainer>
+             ) : (
+               <div className="h-full flex items-center justify-center text-gray-400">لا توجد طلبات</div>
+             )}
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card className="bg-white shadow-sm">
-              <div className="p-5">
-                <p className="text-xs font-medium text-zinc-600 mb-2">إجمالي المبيعات</p>
-                <p className="text-xl font-bold text-zinc-950">
-                  {formatCurrency(kpis.gross_sales)} <span className="text-sm font-normal text-zinc-600">ج.م</span>
-                </p>
-              </div>
-            </Card>
-            <Card className="bg-white shadow-sm">
-              <div className="p-5">
-                <p className="text-xs font-medium text-zinc-600 mb-2">تكلفة البضاعة</p>
-                <p className="text-xl font-bold text-zinc-950">
-                  {formatCurrency(kpis.total_cogs)} <span className="text-sm font-normal text-zinc-600">ج.م</span>
-                </p>
-              </div>
-            </Card>
-            <Card className="bg-white shadow-sm">
-              <div className="p-5">
-                <p className="text-xs font-medium text-zinc-600 mb-2">تكلفة الشحن</p>
-                <p className="text-xl font-bold text-zinc-950">
-                  {formatCurrency(kpis.total_shipping_cost)} <span className="text-sm font-normal text-zinc-600">ج.م</span>
-                </p>
-              </div>
-            </Card>
-          </div>
-        </>
-      )}
+        </div>
+      </div>
     </div>
+  );
+}
+
+// Helper Component for Stat Cards
+function StatCard({ title, value, icon, trend, color }: any) {
+  return (
+    <Card className="p-6 border-none shadow-sm hover:shadow-md transition-shadow">
+      <div className="flex justify-between items-start">
+        <div>
+          <p className="text-sm font-medium text-gray-500 mb-1">{title}</p>
+          <h3 className="text-2xl font-bold text-gray-900">{value}</h3>
+        </div>
+        <div className={`p-2 rounded-lg bg-${color}-50`}>
+          {icon}
+        </div>
+      </div>
+      {trend && (
+        <div className={`mt-4 flex items-center text-xs ${trend === 'up' ? 'text-emerald-600' : 'text-red-600'}`}>
+          {trend === 'up' ? <TrendingUp className="w-3 h-3 mr-1" /> : <TrendingDown className="w-3 h-3 mr-1" />}
+          <span className="font-medium">{trend === 'up' ? 'تحسن' : 'تراجع'}</span>
+          <span className="text-gray-400 mx-1">مقارنة بالفترة السابقة</span>
+        </div>
+      )}
+    </Card>
   );
 }
