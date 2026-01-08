@@ -114,10 +114,10 @@ export interface UpdateStatusInput {
 }
 
 export interface OrderWithRelations extends Order {
-  status: Status;
-  country: Country;
-  carrier: Carrier;
-  employee: Employee;
+  status: Status | null;
+  country: Country | null;
+  carrier: Carrier | null;
+  employee: Employee | null;
 }
 
 export interface OrderFilters {

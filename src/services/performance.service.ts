@@ -24,6 +24,8 @@ export class PerformanceService {
     const breakdown = new Map<string, PerformanceBreakdown>();
 
     orders?.forEach((order: any) => {
+      if (!order.country) return;
+
       const countryId = order.country.id;
       const countryName = order.country.name_ar;
 
@@ -45,10 +47,10 @@ export class PerformanceService {
       item.gross_sales += order.revenue || 0;
       item.net_profit += order.profit || ((order.revenue || 0) - (order.cost || 0) - (order.shipping_cost || 0));
 
-      if (order.status.counts_as_delivered) {
+      if (order.status?.counts_as_delivered) {
         item.delivered_orders++;
       }
-      if (order.status.counts_as_return) {
+      if (order.status?.counts_as_return) {
         item.return_orders++;
       }
     });
@@ -83,6 +85,8 @@ export class PerformanceService {
     const breakdown = new Map<string, PerformanceBreakdown>();
 
     orders?.forEach((order: any) => {
+      if (!order.carrier) return;
+
       const carrierId = order.carrier.id;
       const carrierName = order.carrier.name_ar;
 
@@ -104,10 +108,10 @@ export class PerformanceService {
       item.gross_sales += order.revenue || 0;
       item.net_profit += order.profit || ((order.revenue || 0) - (order.cost || 0) - (order.shipping_cost || 0));
 
-      if (order.status.counts_as_delivered) {
+      if (order.status?.counts_as_delivered) {
         item.delivered_orders++;
       }
-      if (order.status.counts_as_return) {
+      if (order.status?.counts_as_return) {
         item.return_orders++;
       }
     });
@@ -142,6 +146,8 @@ export class PerformanceService {
     const breakdown = new Map<string, PerformanceBreakdown>();
 
     orders?.forEach((order: any) => {
+      if (!order.employee) return;
+
       const employeeId = order.employee.id;
       const employeeName = order.employee.name_ar;
 
@@ -163,10 +169,10 @@ export class PerformanceService {
       item.gross_sales += order.revenue || 0;
       item.net_profit += order.profit || ((order.revenue || 0) - (order.cost || 0) - (order.shipping_cost || 0));
 
-      if (order.status.counts_as_delivered) {
+      if (order.status?.counts_as_delivered) {
         item.delivered_orders++;
       }
-      if (order.status.counts_as_return) {
+      if (order.status?.counts_as_return) {
         item.return_orders++;
       }
     });
@@ -230,10 +236,10 @@ export class PerformanceService {
       product.gross_sales += (item.unit_price || 0) * (item.quantity || 1);
       product.net_profit += ((item.unit_price || 0) - (item.unit_cost || 0)) * (item.quantity || 1);
 
-      if (item.order.status.counts_as_delivered) {
+      if (item.order.status?.counts_as_delivered) {
         product.delivered_orders++;
       }
-      if (item.order.status.counts_as_return) {
+      if (item.order.status?.counts_as_return) {
         product.return_orders++;
       }
       product.total_orders++;

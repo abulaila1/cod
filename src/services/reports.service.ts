@@ -70,10 +70,10 @@ export class ReportsService {
 
       summary.net_profit += order.profit || ((order.revenue || 0) - (order.cost || 0) - (order.shipping_cost || 0));
 
-      if (order.status.counts_as_delivered) {
+      if (order.status?.counts_as_delivered) {
         summary.delivered_orders++;
       }
-      if (order.status.counts_as_return) {
+      if (order.status?.counts_as_return) {
         summary.return_orders++;
       }
     });
@@ -204,10 +204,10 @@ export class ReportsService {
 
       row.net_profit += order.profit || ((order.revenue || 0) - (order.cost || 0) - (order.shipping_cost || 0));
 
-      if (order.status.counts_as_delivered) {
+      if (order.status?.counts_as_delivered) {
         row.delivered_orders++;
       }
-      if (order.status.counts_as_return) {
+      if (order.status?.counts_as_return) {
         row.return_orders++;
       }
     });

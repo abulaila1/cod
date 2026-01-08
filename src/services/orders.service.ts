@@ -44,10 +44,10 @@ export class OrdersService {
       .select(
         `
         *,
-        status:statuses!inner(id, key, label_ar, is_final, counts_as_delivered, counts_as_return, counts_as_active),
-        country:countries!inner(id, name_ar, currency),
-        carrier:carriers!inner(id, name_ar),
-        employee:employees!inner(id, name_ar, role)
+        status:statuses(id, key, label_ar, is_final, counts_as_delivered, counts_as_return, counts_as_active),
+        country:countries(id, name_ar, currency),
+        carrier:carriers(id, name_ar),
+        employee:employees(id, name_ar, role)
       `,
         { count: 'exact' }
       )
@@ -250,15 +250,15 @@ export class OrdersService {
     if (patch.notes !== undefined) result.notes = order.notes;
     if (patch.country_id !== undefined) {
       result.country_id = order.country_id;
-      result.country_name = order.country.name_ar;
+      result.country_name = order.country?.name_ar || null;
     }
     if (patch.carrier_id !== undefined) {
       result.carrier_id = order.carrier_id;
-      result.carrier_name = order.carrier.name_ar;
+      result.carrier_name = order.carrier?.name_ar || null;
     }
     if (patch.employee_id !== undefined) {
       result.employee_id = order.employee_id;
-      result.employee_name = order.employee.name_ar;
+      result.employee_name = order.employee?.name_ar || null;
     }
 
     return result;
@@ -338,10 +338,10 @@ export class OrdersService {
     const rows = response.rows.map((order) => [
       order.id.substring(0, 8),
       new Date(order.order_date).toLocaleDateString('ar-EG'),
-      order.status.label_ar,
-      order.country.name_ar,
-      order.carrier.name_ar,
-      order.employee.name_ar,
+      order.status?.label_ar || '-',
+      order.country?.name_ar || '-',
+      order.carrier?.name_ar || '-',
+      order.employee?.name_ar || '-',
       order.revenue.toFixed(2),
       order.cost.toFixed(2),
       order.shipping_cost.toFixed(2),

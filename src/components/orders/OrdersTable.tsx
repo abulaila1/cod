@@ -134,13 +134,13 @@ export function OrdersTable({
                   </Select>
                 </td>
                 <td className="px-4 py-3 text-sm text-zinc-950">
-                  {order.country.name_ar}
+                  {order.country?.name_ar || '-'}
                 </td>
                 <td className="px-4 py-3 text-sm text-zinc-950">
-                  {order.carrier.name_ar}
+                  {order.carrier?.name_ar || '-'}
                 </td>
                 <td className="px-4 py-3 text-sm text-zinc-950">
-                  {order.employee.name_ar}
+                  {order.employee?.name_ar || '-'}
                 </td>
                 <td className="px-4 py-3 text-sm font-medium text-zinc-950">
                   {formatCurrency(order.revenue)}

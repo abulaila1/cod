@@ -187,21 +187,21 @@ export function OrderDetailsDrawer({
                     <label className="block text-sm font-medium text-zinc-700 mb-1">
                       الدولة
                     </label>
-                    <p className="text-sm text-zinc-950">{order.country.name_ar}</p>
+                    <p className="text-sm text-zinc-950">{order.country?.name_ar || '-'}</p>
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-zinc-700 mb-1">
                       شركة الشحن
                     </label>
-                    <p className="text-sm text-zinc-950">{order.carrier.name_ar}</p>
+                    <p className="text-sm text-zinc-950">{order.carrier?.name_ar || '-'}</p>
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-zinc-700 mb-1">
                       الموظف
                     </label>
-                    <p className="text-sm text-zinc-950">{order.employee.name_ar}</p>
+                    <p className="text-sm text-zinc-950">{order.employee?.name_ar || '-'}</p>
                   </div>
                 </div>
               </CardContent>
