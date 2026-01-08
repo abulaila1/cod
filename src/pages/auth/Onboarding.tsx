@@ -184,46 +184,30 @@ export function Onboarding() {
         </div>
 
         <div>
-          <label htmlFor="currency" className="block text-sm font-medium text-gray-700 mb-2 text-right">
-            العملة الافتراضية <span className="text-red-500">*</span>
-          </label>
           <Select
             id="currency"
+            label="العملة الافتراضية"
             value={currency}
             onChange={(e) => setCurrency(e.target.value)}
             disabled={isCreating}
             className="text-right"
+            options={CURRENCIES}
+            hint="سيتم استخدام هذه العملة في جميع التقارير والفواتير"
             required
-          >
-            {CURRENCIES.map((curr) => (
-              <option key={curr.value} value={curr.value}>
-                {curr.label}
-              </option>
-            ))}
-          </Select>
-          <p className="mt-2 text-sm text-gray-500 text-right">
-            سيتم استخدام هذه العملة في جميع التقارير والفواتير
-          </p>
+          />
         </div>
 
         <div>
-          <label htmlFor="country" className="block text-sm font-medium text-gray-700 mb-2 text-right">
-            الدولة <span className="text-red-500">*</span>
-          </label>
           <Select
             id="country"
+            label="الدولة"
             value={country}
             onChange={(e) => setCountry(e.target.value)}
             disabled={isCreating}
             className="text-right"
+            options={COUNTRIES}
             required
-          >
-            {COUNTRIES.map((c) => (
-              <option key={c.value} value={c.value}>
-                {c.label}
-              </option>
-            ))}
-          </Select>
+          />
         </div>
 
         {success && (

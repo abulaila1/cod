@@ -5,11 +5,14 @@ interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
   label?: string;
   error?: string;
   hint?: string;
-  options: { value: string; label: string }[];
+  options?: { value: string; label: string }[];
 }
 
 export const Select = forwardRef<HTMLSelectElement, SelectProps>(
-  ({ label, error, hint, options, className = '', ...props }, ref) => {
+  ({ label, error, hint, options, className = '', children, ...props }, ref) => {
+    const safeOptions = options || [];
+    const hasOptions = safeOptions.length > 0;
+
     return (
       <div className="w-full">
         {label && (
@@ -33,11 +36,15 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
             `}
             {...props}
           >
-            {options.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
+            {hasOptions ? (
+              safeOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))
+            ) : (
+              children
+            )}
           </select>
           <ChevronDown className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary-400 pointer-events-none" />
         </div>
