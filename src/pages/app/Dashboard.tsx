@@ -1,65 +1,78 @@
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import {
   AreaChart, Area, PieChart, Pie, Cell,
   ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid, Legend
 } from 'recharts';
 import {
-  TrendingUp, TrendingDown, Package,
-  Truck, DollarSign, RefreshCw
+  Package, Truck, DollarSign, RefreshCw
 } from 'lucide-react';
 import { useOrdersList } from '@/hooks/useOrdersList';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { Card } from '@/components/ui/Card';
 import { Skeleton } from '@/components/common/Skeleton';
-import { formatCurrency } from '@/utils/format';
+
+const formatCurrency = (amount: number, currency = 'USD') => {
+  try {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: currency,
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    }).format(amount);
+  } catch {
+    return `${amount} ${currency}`;
+  }
+};
 
 export function Dashboard() {
   const { currentBusiness } = useBusiness();
   const { orders, isLoading } = useOrdersList();
 
   const metrics = useMemo(() => {
-    if (!orders || !orders.length) return null;
+    const safeOrders = orders || [];
 
-    const totalOrders = orders.length;
-    const delivered = orders.filter(o => o.status === 'delivered').length;
-    const returned = orders.filter(o => o.status === 'returned').length;
-    const totalRevenue = orders.reduce((sum, o) => sum + (Number(o.total_amount) || 0), 0);
-    const netProfit = orders.reduce((sum, o) => sum + ((Number(o.total_amount) || 0) - (Number(o.shipping_cost) || 0)), 0);
+    const totalOrders = safeOrders.length;
+    const delivered = safeOrders.filter(o => o.status === 'delivered').length;
+    const returned = safeOrders.filter(o => o.status === 'returned').length;
 
-    return {
-      totalOrders,
-      totalRevenue,
-      netProfit,
-      deliveryRate: totalOrders ? Math.round((delivered / totalOrders) * 100) : 0,
-      returnRate: totalOrders ? Math.round((returned / totalOrders) * 100) : 0
-    };
+    const totalRevenue = safeOrders.reduce((sum, o) => sum + (Number(o.total_amount) || 0), 0);
+    const netProfit = safeOrders.reduce((sum, o) => sum + ((Number(o.total_amount) || 0) - (Number(o.shipping_cost) || 0)), 0);
+
+    const deliveryRate = totalOrders ? Math.round((delivered / totalOrders) * 100) : 0;
+    const returnRate = totalOrders ? Math.round((returned / totalOrders) * 100) : 0;
+
+    return { totalOrders, totalRevenue, netProfit, deliveryRate, returnRate };
   }, [orders]);
 
   const chartData = useMemo(() => {
-    if (!orders || !orders.length) return [];
-    // Group last 7 days (mock logic for demo stability)
-    return orders.slice(0, 10).map((o, i) => ({
+    const safeOrders = orders || [];
+    if (!safeOrders.length) return [];
+
+    return safeOrders.slice(0, 10).map((o) => ({
       date: new Date(o.created_at).toLocaleDateString(),
       sales: Number(o.total_amount) || 0,
-      profit: (Number(o.total_amount) || 0) * 0.3 // estimated margin
+      profit: (Number(o.total_amount) || 0) * 0.3
     }));
   }, [orders]);
 
   const statusData = useMemo(() => {
-    if (!orders) return [];
+    const safeOrders = orders || [];
     const stats = { delivered: 0, returned: 0, pending: 0, shipping: 0 };
-    orders.forEach(o => {
+    safeOrders.forEach(o => {
       if (o.status === 'delivered') stats.delivered++;
       else if (o.status === 'returned') stats.returned++;
       else if (o.status === 'pending') stats.pending++;
       else stats.shipping++;
     });
-    return [
+
+    const data = [
       { name: 'تم التسليم', value: stats.delivered, color: '#10B981' },
       { name: 'مرتجع', value: stats.returned, color: '#EF4444' },
       { name: 'قيد الشحن', value: stats.shipping, color: '#3B82F6' },
       { name: 'معلق', value: stats.pending, color: '#F59E0B' },
     ].filter(d => d.value > 0);
+
+    return data.length > 0 ? data : [{ name: 'لا يوجد بيانات', value: 1, color: '#E5E7EB' }];
   }, [orders]);
 
   if (isLoading) return <div className="p-8"><Skeleton className="h-96 w-full" /></div>;
@@ -74,25 +87,45 @@ export function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard title="صافي الربح" value={formatCurrency(metrics?.netProfit || 0, currentBusiness?.currency)} icon={<DollarSign className="w-5 h-5 text-emerald-600" />} color="emerald" />
-        <StatCard title="إجمالي الطلبات" value={metrics?.totalOrders || 0} icon={<Package className="w-5 h-5 text-blue-600" />} color="blue" />
-        <StatCard title="نسبة التسليم" value={`${metrics?.deliveryRate || 0}%`} icon={<Truck className="w-5 h-5 text-purple-600" />} color="purple" />
-        <StatCard title="نسبة المرتجع" value={`${metrics?.returnRate || 0}%`} icon={<RefreshCw className="w-5 h-5 text-red-600" />} color="red" />
+        <StatCard
+          title="صافي الربح"
+          value={formatCurrency(metrics?.netProfit || 0, currentBusiness?.currency)}
+          icon={<DollarSign className="w-5 h-5 text-emerald-600" />}
+          color="emerald"
+        />
+        <StatCard
+          title="إجمالي الطلبات"
+          value={metrics?.totalOrders || 0}
+          icon={<Package className="w-5 h-5 text-blue-600" />}
+          color="blue"
+        />
+        <StatCard
+          title="نسبة التسليم"
+          value={`${metrics?.deliveryRate || 0}%`}
+          icon={<Truck className="w-5 h-5 text-purple-600" />}
+          color="purple"
+        />
+        <StatCard
+          title="نسبة المرتجع"
+          value={`${metrics?.returnRate || 0}%`}
+          icon={<RefreshCw className="w-5 h-5 text-red-600" />}
+          color="red"
+        />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <h3 className="text-lg font-semibold mb-6">الأداء المالي</h3>
           <div className="h-80 w-full" dir="ltr">
-             <ResponsiveContainer width="100%" height="100%">
-               <AreaChart data={chartData}>
-                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                 <XAxis dataKey="date" />
-                 <YAxis />
-                 <Tooltip />
-                 <Area type="monotone" dataKey="sales" stroke="#3B82F6" fill="#3B82F6" fillOpacity={0.1} />
-               </AreaChart>
-             </ResponsiveContainer>
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="date" />
+                <YAxis />
+                <Tooltip />
+                <Area type="monotone" dataKey="sales" stroke="#3B82F6" fill="#3B82F6" fillOpacity={0.1} />
+              </AreaChart>
+            </ResponsiveContainer>
           </div>
         </div>
 
@@ -101,8 +134,15 @@ export function Dashboard() {
           <div className="h-64 w-full" dir="ltr">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie data={statusData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} dataKey="value">
-                  {statusData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
+                <Pie
+                  data={statusData}
+                  cx="50%" cy="50%"
+                  innerRadius={60} outerRadius={80}
+                  dataKey="value"
+                >
+                  {statusData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
                 </Pie>
                 <Tooltip />
                 <Legend />
@@ -115,7 +155,7 @@ export function Dashboard() {
   );
 }
 
-function StatCard({ title, value, icon, color }: any) {
+function StatCard({ title, value, icon, color }: { title: string; value: string | number; icon: React.ReactNode; color: string }) {
   return (
     <Card className="p-6 border-none shadow-sm">
       <div className="flex justify-between items-start">
