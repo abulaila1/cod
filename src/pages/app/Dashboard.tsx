@@ -1,9 +1,5 @@
 import { useMemo } from 'react';
 import {
-  AreaChart, Area, PieChart, Pie, Cell,
-  ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid, Legend
-} from 'recharts';
-import {
   Package, Truck, DollarSign, RefreshCw
 } from 'lucide-react';
 import { useOrdersList } from '@/hooks/useOrdersList';
@@ -48,11 +44,13 @@ export function Dashboard() {
     const safeOrders = orders || [];
     if (!safeOrders.length) return [];
 
-    return safeOrders.slice(0, 10).map((o) => ({
-      date: new Date(o.created_at).toLocaleDateString(),
-      sales: Number(o.revenue) || 0,
-      profit: (Number(o.revenue) || 0) - (Number(o.cogs) || 0)
-    }));
+    const grouped: Record<string, number> = {};
+    safeOrders.forEach((o) => {
+      const date = new Date(o.created_at).toLocaleDateString('ar-SA', { month: 'short', day: 'numeric' });
+      grouped[date] = (grouped[date] || 0) + (Number(o.revenue) || 0);
+    });
+
+    return Object.entries(grouped).slice(-7).map(([date, sales]) => ({ date, sales }));
   }, [orders]);
 
   const statusData = useMemo(() => {
@@ -64,16 +62,13 @@ export function Dashboard() {
       else if (o.status?.counts_as_active) stats.active++;
     });
 
-    const data = [
-      { name: 'تم التسليم', value: stats.delivered, color: '#10B981' },
-      { name: 'مرتجع', value: stats.returned, color: '#EF4444' },
-      { name: 'نشط', value: stats.active, color: '#3B82F6' },
-    ].filter(d => d.value > 0);
-
-    return data.length > 0 ? data : [{ name: 'لا يوجد بيانات', value: 1, color: '#E5E7EB' }];
+    const total = stats.delivered + stats.returned + stats.active;
+    return { ...stats, total: total || 1 };
   }, [orders]);
 
   if (isLoading) return <div className="p-8"><Skeleton className="h-96 w-full" /></div>;
+
+  const maxSales = Math.max(...chartData.map(d => d.sales), 1);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -100,8 +95,8 @@ export function Dashboard() {
         <StatCard
           title="نسبة التسليم"
           value={`${metrics?.deliveryRate || 0}%`}
-          icon={<Truck className="w-5 h-5 text-purple-600" />}
-          color="purple"
+          icon={<Truck className="w-5 h-5 text-teal-600" />}
+          color="teal"
         />
         <StatCard
           title="نسبة المرتجع"
@@ -114,38 +109,62 @@ export function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <h3 className="text-lg font-semibold mb-6">الأداء المالي</h3>
-          <div className="h-80 w-full" dir="ltr">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="date" />
-                <YAxis />
-                <Tooltip />
-                <Area type="monotone" dataKey="sales" stroke="#3B82F6" fill="#3B82F6" fillOpacity={0.1} />
-              </AreaChart>
-            </ResponsiveContainer>
+          <div className="h-64">
+            {chartData.length > 0 ? (
+              <div className="flex items-end justify-around h-full gap-2 pt-4">
+                {chartData.map((item, index) => (
+                  <div key={index} className="flex flex-col items-center flex-1">
+                    <div className="w-full flex justify-center mb-2">
+                      <div
+                        className="w-8 bg-gradient-to-t from-blue-600 to-blue-400 rounded-t-md transition-all duration-500"
+                        style={{ height: `${(item.sales / maxSales) * 180}px` }}
+                      />
+                    </div>
+                    <span className="text-xs text-gray-500 truncate max-w-full">{item.date}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="h-full flex items-center justify-center text-gray-400">
+                لا توجد بيانات متاحة
+              </div>
+            )}
           </div>
         </div>
 
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <h3 className="text-lg font-semibold mb-6">حالة الطلبات</h3>
-          <div className="h-64 w-full" dir="ltr">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={statusData}
-                  cx="50%" cy="50%"
-                  innerRadius={60} outerRadius={80}
-                  dataKey="value"
-                >
-                  {statusData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
+          <div className="flex flex-col items-center">
+            <div className="relative w-40 h-40">
+              <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                <circle cx="50" cy="50" r="40" fill="none" stroke="#E5E7EB" strokeWidth="12" />
+                <circle
+                  cx="50" cy="50" r="40" fill="none" stroke="#10B981" strokeWidth="12"
+                  strokeDasharray={`${(statusData.delivered / statusData.total) * 251.2} 251.2`}
+                  strokeLinecap="round"
+                />
+                <circle
+                  cx="50" cy="50" r="40" fill="none" stroke="#EF4444" strokeWidth="12"
+                  strokeDasharray={`${(statusData.returned / statusData.total) * 251.2} 251.2`}
+                  strokeDashoffset={`-${(statusData.delivered / statusData.total) * 251.2}`}
+                  strokeLinecap="round"
+                />
+                <circle
+                  cx="50" cy="50" r="40" fill="none" stroke="#3B82F6" strokeWidth="12"
+                  strokeDasharray={`${(statusData.active / statusData.total) * 251.2} 251.2`}
+                  strokeDashoffset={`-${((statusData.delivered + statusData.returned) / statusData.total) * 251.2}`}
+                  strokeLinecap="round"
+                />
+              </svg>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="text-2xl font-bold text-gray-700">{statusData.total > 1 ? statusData.total : 0}</span>
+              </div>
+            </div>
+            <div className="mt-6 space-y-2 w-full">
+              <LegendItem color="bg-emerald-500" label="تم التسليم" value={statusData.delivered} />
+              <LegendItem color="bg-red-500" label="مرتجع" value={statusData.returned} />
+              <LegendItem color="bg-blue-500" label="نشط" value={statusData.active} />
+            </div>
           </div>
         </div>
       </div>
@@ -154,6 +173,12 @@ export function Dashboard() {
 }
 
 function StatCard({ title, value, icon, color }: { title: string; value: string | number; icon: React.ReactNode; color: string }) {
+  const bgColors: Record<string, string> = {
+    emerald: 'bg-emerald-50',
+    blue: 'bg-blue-50',
+    teal: 'bg-teal-50',
+    red: 'bg-red-50',
+  };
   return (
     <Card className="p-6 border-none shadow-sm">
       <div className="flex justify-between items-start">
@@ -161,8 +186,20 @@ function StatCard({ title, value, icon, color }: { title: string; value: string 
           <p className="text-sm font-medium text-gray-500 mb-1">{title}</p>
           <h3 className="text-2xl font-bold text-gray-900">{value}</h3>
         </div>
-        <div className={`p-2 rounded-lg bg-${color}-50`}>{icon}</div>
+        <div className={`p-2 rounded-lg ${bgColors[color] || 'bg-gray-50'}`}>{icon}</div>
       </div>
     </Card>
+  );
+}
+
+function LegendItem({ color, label, value }: { color: string; label: string; value: number }) {
+  return (
+    <div className="flex items-center justify-between text-sm">
+      <div className="flex items-center gap-2">
+        <div className={`w-3 h-3 rounded-full ${color}`} />
+        <span className="text-gray-600">{label}</span>
+      </div>
+      <span className="font-medium text-gray-900">{value}</span>
+    </div>
   );
 }
