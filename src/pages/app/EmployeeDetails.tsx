@@ -168,12 +168,12 @@ export function EmployeeDetails() {
         </button>
         <div>
           <h1 className="text-2xl font-bold text-zinc-900">{employee.name_ar}</h1>
-          <p className="text-zinc-500">{employee.role || 'موظف'}</p>
+          <p className="text-zinc-500">{employee.name_en || 'موظف'}</p>
         </div>
         <div className={`mr-auto px-3 py-1 rounded-full text-sm font-medium ${
-          employee.active ? 'bg-emerald-100 text-emerald-700' : 'bg-zinc-100 text-zinc-600'
+          employee.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-zinc-100 text-zinc-600'
         }`}>
-          {employee.active ? 'نشط' : 'غير نشط'}
+          {employee.is_active ? 'نشط' : 'غير نشط'}
         </div>
       </div>
 

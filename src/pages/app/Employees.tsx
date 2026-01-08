@@ -31,7 +31,7 @@ import type { PerformanceBreakdown } from '@/types/performance';
 
 interface EmployeeFormData {
   name_ar: string;
-  role: string;
+  name_en: string;
   email: string;
   password: string;
   salary: string;
@@ -40,7 +40,7 @@ interface EmployeeFormData {
 
 const initialFormData: EmployeeFormData = {
   name_ar: '',
-  role: '',
+  name_en: '',
   email: '',
   password: '',
   salary: '',
@@ -94,7 +94,7 @@ export function Employees() {
       setEditingEmployee(employee);
       setFormData({
         name_ar: employee.name_ar,
-        role: employee.role || '',
+        name_en: employee.name_en || '',
         email: employee.email || '',
         password: '',
         salary: employee.salary?.toString() || '',
@@ -137,7 +137,7 @@ export function Employees() {
       if (editingEmployee) {
         const updateInput: UpdateEmployeeInput = {
           name_ar: formData.name_ar,
-          role: formData.role || undefined,
+          name_en: formData.name_en || undefined,
           email: formData.email || undefined,
           salary: formData.salary ? parseFloat(formData.salary) : undefined,
           permissions: formData.permissions,
@@ -149,7 +149,7 @@ export function Employees() {
       } else {
         const createInput: CreateEmployeeInput = {
           name_ar: formData.name_ar,
-          role: formData.role || undefined,
+          name_en: formData.name_en || undefined,
           email: formData.email || undefined,
           password: formData.password || undefined,
           salary: formData.salary ? parseFloat(formData.salary) : undefined,
@@ -172,7 +172,7 @@ export function Employees() {
     if (!currentBusiness) return;
 
     try {
-      await EmployeesService.toggleActive(currentBusiness.id, employee.id, !employee.active);
+      await EmployeesService.toggleActive(currentBusiness.id, employee.id, !employee.is_active);
       loadData();
     } catch (error) {
       console.error('Failed to toggle employee status:', error);
@@ -195,14 +195,14 @@ export function Employees() {
 
   const filteredEmployees = employees.filter(e =>
     e.name_ar.toLowerCase().includes(search.toLowerCase()) ||
-    e.role?.toLowerCase().includes(search.toLowerCase()) ||
+    e.name_en?.toLowerCase().includes(search.toLowerCase()) ||
     e.email?.toLowerCase().includes(search.toLowerCase())
   );
 
   const stats = {
     total: employees.length,
-    active: employees.filter(e => e.active).length,
-    totalSalary: employees.filter(e => e.active).reduce((sum, e) => sum + (e.salary || 0), 0),
+    active: employees.filter(e => e.is_active).length,
+    totalSalary: employees.filter(e => e.is_active).reduce((sum, e) => sum + (e.salary || 0), 0),
   };
 
   if (!currentBusiness) {
@@ -320,16 +320,16 @@ export function Employees() {
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center gap-3">
                       <div className={`w-14 h-14 rounded-full flex items-center justify-center text-xl font-bold ${
-                        employee.active ? 'bg-blue-100 text-blue-600' : 'bg-zinc-100 text-zinc-400'
+                        employee.is_active ? 'bg-blue-100 text-blue-600' : 'bg-zinc-100 text-zinc-400'
                       }`}>
                         {employee.name_ar.charAt(0)}
                       </div>
                       <div>
                         <h3 className="font-semibold text-zinc-900">{employee.name_ar}</h3>
-                        {employee.role && (
+                        {employee.name_en && (
                           <p className="text-sm text-zinc-500 flex items-center gap-1">
                             <Briefcase className="w-3.5 h-3.5" />
-                            {employee.role}
+                            {employee.name_en}
                           </p>
                         )}
                       </div>
@@ -359,7 +359,7 @@ export function Employees() {
                             onClick={() => handleToggleActive(employee)}
                             className="w-full px-4 py-2 text-right text-sm hover:bg-zinc-50 flex items-center gap-2"
                           >
-                            {employee.active ? (
+                            {employee.is_active ? (
                               <>
                                 <EyeOff className="w-4 h-4" />
                                 تعطيل
@@ -459,12 +459,12 @@ export function Employees() {
             <div>
               <label className="block text-sm font-medium text-zinc-700 mb-1.5">
                 <Briefcase className="w-4 h-4 inline ml-1" />
-                الوظيفة
+                الاسم بالإنجليزي
               </label>
               <Input
-                value={formData.role}
-                onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                placeholder="مثال: موظف تأكيد"
+                value={formData.name_en}
+                onChange={(e) => setFormData({ ...formData, name_en: e.target.value })}
+                placeholder="Employee Name"
               />
             </div>
           </div>

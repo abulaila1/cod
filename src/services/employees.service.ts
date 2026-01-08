@@ -7,11 +7,11 @@ export interface Employee {
   id: string;
   business_id: string;
   name_ar: string;
-  role: string | null;
+  name_en: string | null;
   email: string | null;
   salary: number;
   permissions: string[];
-  active: boolean;
+  is_active: boolean;
   last_login_at: string | null;
   created_at: string;
 }
@@ -66,7 +66,7 @@ export interface EmployeeFilters {
 
 export interface CreateEmployeeInput {
   name_ar: string;
-  role?: string;
+  name_en?: string;
   email?: string;
   password?: string;
   salary?: number;
@@ -75,12 +75,12 @@ export interface CreateEmployeeInput {
 
 export interface UpdateEmployeeInput {
   name_ar?: string;
-  role?: string;
+  name_en?: string;
   email?: string;
   password?: string;
   salary?: number;
   permissions?: string[];
-  active?: boolean;
+  is_active?: boolean;
 }
 
 export const AVAILABLE_PERMISSIONS = [
@@ -117,11 +117,11 @@ export class EmployeesService {
       .eq('business_id', businessId);
 
     if (filters.activeOnly !== undefined) {
-      query = query.eq('active', filters.activeOnly);
+      query = query.eq('is_active', filters.activeOnly);
     }
 
     if (filters.search) {
-      query = query.or(`name_ar.ilike.%${filters.search}%,role.ilike.%${filters.search}%,email.ilike.%${filters.search}%`);
+      query = query.or(`name_ar.ilike.%${filters.search}%,name_en.ilike.%${filters.search}%,email.ilike.%${filters.search}%`);
     }
 
     const sortField = filters.sort || 'created_at';
@@ -161,11 +161,11 @@ export class EmployeesService {
     const insertData: Record<string, unknown> = {
       business_id: businessId,
       name_ar: input.name_ar,
-      role: input.role || null,
+      name_en: input.name_en || input.name_ar,
       email: input.email || null,
       salary: input.salary || 0,
       permissions: input.permissions || [],
-      active: true,
+      is_active: true,
     };
 
     if (input.password) {
@@ -209,11 +209,11 @@ export class EmployeesService {
 
     const updateData: Record<string, unknown> = {};
     if (input.name_ar !== undefined) updateData.name_ar = input.name_ar;
-    if (input.role !== undefined) updateData.role = input.role;
+    if (input.name_en !== undefined) updateData.name_en = input.name_en;
     if (input.email !== undefined) updateData.email = input.email;
     if (input.salary !== undefined) updateData.salary = input.salary;
     if (input.permissions !== undefined) updateData.permissions = input.permissions;
-    if (input.active !== undefined) updateData.active = input.active;
+    if (input.is_active !== undefined) updateData.is_active = input.is_active;
     if (input.password) {
       updateData.password_hash = hashPassword(input.password);
     }
@@ -246,9 +246,9 @@ export class EmployeesService {
   static async toggleActive(
     businessId: string,
     employeeId: string,
-    active: boolean
+    isActive: boolean
   ): Promise<Employee> {
-    return this.update(businessId, employeeId, { active });
+    return this.update(businessId, employeeId, { is_active: isActive });
   }
 
   static async delete(businessId: string, employeeId: string): Promise<void> {
@@ -279,7 +279,7 @@ export class EmployeesService {
       .select('*')
       .eq('business_id', businessId)
       .eq('email', email)
-      .eq('active', true)
+      .eq('is_active', true)
       .maybeSingle();
 
     if (error || !data) return null;
@@ -526,18 +526,18 @@ export class EmployeesService {
 
     const headers = [
       { key: 'name_ar', label: 'الاسم' },
-      { key: 'role', label: 'الوظيفة' },
+      { key: 'name_en', label: 'الاسم بالانجليزي' },
       { key: 'email', label: 'البريد الإلكتروني' },
       { key: 'salary', label: 'الراتب' },
-      { key: 'active', label: 'نشط' },
+      { key: 'is_active', label: 'نشط' },
     ];
 
     const data = employees.map((e) => ({
       name_ar: e.name_ar,
-      role: e.role || '',
+      name_en: e.name_en || '',
       email: e.email || '',
       salary: e.salary,
-      active: e.active ? 'نعم' : 'لا',
+      is_active: e.is_active ? 'نعم' : 'لا',
     }));
 
     exportToExcel(data, `employees-${Date.now()}.xlsx`, headers);
