@@ -51,7 +51,7 @@ export function ImportModal({ isOpen, onClose, onImport, onDownloadTemplate, tem
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="استيراد من CSV">
+    <Modal isOpen={isOpen} onClose={handleClose} title="استيراد البيانات">
       <div className="space-y-4">
         {templateAvailable && onDownloadTemplate && (
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -80,11 +80,12 @@ export function ImportModal({ isOpen, onClose, onImport, onDownloadTemplate, tem
 
         <div className="border-2 border-dashed border-zinc-300 rounded-lg p-6 text-center">
           <Upload className="h-12 w-12 mx-auto text-zinc-400 mb-3" />
-          <p className="text-sm text-zinc-600 mb-2">اختر ملف CSV للاستيراد</p>
+          <p className="text-sm text-zinc-600 mb-2">اختر ملف Excel أو CSV للاستيراد</p>
+          <p className="text-xs text-zinc-500 mb-3">يدعم: .xlsx, .xls, .csv</p>
           <input
             ref={fileInputRef}
             type="file"
-            accept=".csv"
+            accept=".csv,.xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
             onChange={handleFileChange}
             className="hidden"
             id="csv-upload"

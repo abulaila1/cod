@@ -1,6 +1,8 @@
 import { supabase } from './supabase';
 import { AuditService } from './audit.service';
 import { exportToCSV } from '@/utils/csv';
+import { exportToExcel } from '@/utils/excel';
+import { parseImportFile } from '@/utils/file-parser';
 import type { Product } from '@/types/domain';
 
 export interface ProductFilters {
@@ -156,28 +158,20 @@ export class ProductsService {
       active: p.active ? 'نعم' : 'لا',
     }));
 
-    exportToCSV(data, `products-${Date.now()}.csv`, headers);
+    exportToExcel(data, `products-${Date.now()}.xlsx`, headers);
   }
 
   static async importCSV(
     businessId: string,
     file: File
   ): Promise<{ success: number; errors: string[] }> {
-    const text = await file.text();
-    const lines = text.split('\n').filter((line) => line.trim());
-
-    if (lines.length < 2) {
-      throw new Error('الملف فارغ أو لا يحتوي على بيانات');
-    }
-
-    const header = lines[0].toLowerCase();
-    const isArabic = header.includes('الاسم');
+    const parsed = await parseImportFile(file);
 
     const results = { success: 0, errors: [] as string[] };
 
-    for (let i = 1; i < lines.length; i++) {
+    for (let i = 0; i < parsed.dataRows.length; i++) {
       try {
-        const cols = lines[i].split(',').map((c) => c.trim().replace(/^"|"$/g, ''));
+        const cols = parsed.dataRows[i];
 
         if (cols.length < 2) continue;
 
@@ -186,14 +180,14 @@ export class ProductsService {
         const base_cogs = parseFloat(cols[2]) || 0;
 
         if (!name_ar) {
-          results.errors.push(`السطر ${i + 1}: اسم المنتج مطلوب`);
+          results.errors.push(`السطر ${i + 2}: اسم المنتج مطلوب`);
           continue;
         }
 
         await this.create(businessId, { name_ar, sku: sku || undefined, base_cogs });
         results.success++;
       } catch (error: any) {
-        results.errors.push(`السطر ${i + 1}: ${error.message}`);
+        results.errors.push(`السطر ${i + 2}: ${error.message}`);
       }
     }
 
