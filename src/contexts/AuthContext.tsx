@@ -14,12 +14,14 @@ interface AuthContextValue {
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
+  isNoWorkspace: boolean;
   signUp: (email: string, password: string, name: string) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: Error | null }>;
   updatePassword: (newPassword: string) => Promise<{ error: Error | null }>;
   verifyBusinessAccess: () => Promise<{ hasAccess: boolean; error: string | null }>;
+  checkWorkspaceStatus: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -29,12 +31,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isNoWorkspace, setIsNoWorkspace] = useState(false);
 
   useEffect(() => {
     initializeAuth();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      handleSessionChange(session);
+      handleSessionChange(session).catch(err => {
+        console.error('Error in handleSessionChange:', err);
+      });
     });
 
     return () => {
@@ -53,18 +58,59 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const handleSessionChange = (session: Session | null) => {
+  const handleSessionChange = async (session: Session | null) => {
     setSession(session);
     setError(null);
 
     if (session?.user) {
-      setUser({
+      const authUser = {
         id: session.user.id,
         email: session.user.email || '',
         name: session.user.user_metadata?.name || 'مستخدم',
-      });
+      };
+      setUser(authUser);
+
+      await checkWorkspaceStatusForUser(authUser.id);
     } else {
       setUser(null);
+      setIsNoWorkspace(false);
+    }
+  };
+
+  const checkWorkspaceStatusForUser = async (userId: string) => {
+    try {
+      const { data, error: queryError } = await supabase
+        .from('business_members')
+        .select('id, business_id, status')
+        .eq('user_id', userId)
+        .eq('status', 'active')
+        .maybeSingle();
+
+      if (queryError) {
+        console.error('Error checking workspace status:', queryError);
+        setIsNoWorkspace(true);
+        setError(`خطأ في التحقق من الوورك سبيس: ${queryError.message}`);
+        return;
+      }
+
+      if (!data) {
+        console.warn('User has no workspace - flagging isNoWorkspace');
+        setIsNoWorkspace(true);
+        setError(null);
+      } else {
+        setIsNoWorkspace(false);
+        setError(null);
+      }
+    } catch (err) {
+      console.error('Unexpected error checking workspace:', err);
+      setIsNoWorkspace(true);
+      setError(err instanceof Error ? err.message : 'خطأ غير متوقع');
+    }
+  };
+
+  const checkWorkspaceStatus = async () => {
+    if (user) {
+      await checkWorkspaceStatusForUser(user.id);
     }
   };
 
@@ -146,6 +192,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
     setUser(null);
     setSession(null);
+    setIsNoWorkspace(false);
+    setError(null);
     localStorage.removeItem('currentBusinessId');
   };
 
@@ -187,12 +235,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAuthenticated: !!user && !!session,
         isLoading,
         error,
+        isNoWorkspace,
         signUp,
         signIn,
         signOut,
         resetPassword,
         updatePassword,
         verifyBusinessAccess,
+        checkWorkspaceStatus,
       }}
     >
       {children}

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/services/supabase';
+import { useAuth } from '@/contexts/AuthContext';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { AuthLayout } from '@/components/layout';
 import { Button } from '@/components/ui';
@@ -8,6 +9,7 @@ import { Loader2, AlertCircle } from 'lucide-react';
 
 export function AuthCallback() {
   const navigate = useNavigate();
+  const { isNoWorkspace, checkWorkspaceStatus } = useAuth();
   const { ensureWorkspace, refreshBusinesses } = useBusiness();
   const [status, setStatus] = useState<'loading' | 'provisioning' | 'error'>('loading');
   const [error, setError] = useState<string | null>(null);
@@ -65,6 +67,10 @@ export function AuthCallback() {
         return;
       }
 
+      await checkWorkspaceStatus();
+
+      await new Promise(resolve => setTimeout(resolve, 500));
+
       await provisionWorkspace();
     } catch (err) {
       console.error('Error in callback:', err);
@@ -77,12 +83,22 @@ export function AuthCallback() {
     try {
       setStatus('provisioning');
 
+      if (!isNoWorkspace) {
+        console.log('User already has a workspace - refreshing businesses');
+        await refreshBusinesses();
+        navigate('/app/dashboard', { replace: true });
+        return;
+      }
+
+      console.log('User has no workspace - creating new workspace');
       const business = await ensureWorkspace();
 
       if (!business) {
         console.error('ensureWorkspace returned null');
         throw new Error('فشل إنشاء الوورك سبيس. يرجى المحاولة مرة أخرى.');
       }
+
+      await checkWorkspaceStatus();
 
       await refreshBusinesses();
 
