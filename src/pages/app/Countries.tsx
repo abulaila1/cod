@@ -1,188 +1,88 @@
 import { useState, useEffect } from 'react';
 import { useBusiness } from '@/contexts/BusinessContext';
+import { PerformanceService } from '@/services/performance.service';
 import { CountriesService } from '@/services/countries.service';
-import { EntityPageLayout } from '@/components/entity/EntityPageLayout';
-import { EntityTable, EntityColumn } from '@/components/entity/EntityTable';
-import { EntityModal } from '@/components/entity/EntityModal';
-import { ImportModal } from '@/components/entity/ImportModal';
-import { Input } from '@/components/ui';
-import type { Country } from '@/types/domain';
+import { PageHeader } from '@/components/common/PageHeader';
+import { CountriesPerformanceTable } from '@/components/performance/CountriesPerformanceTable';
+import { DateRangePicker } from '@/components/ui';
+import type { PerformanceBreakdown } from '@/types/performance';
 
 export function Countries() {
   const { currentBusiness } = useBusiness();
-  const [countries, setCountries] = useState<Country[]>([]);
+  const [data, setData] = useState<PerformanceBreakdown[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [searchValue, setSearchValue] = useState('');
 
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isImportOpen, setIsImportOpen] = useState(false);
-  const [editingCountry, setEditingCountry] = useState<Country | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
+  const today = new Date();
+  const thirtyDaysAgo = new Date(today);
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-  const [formData, setFormData] = useState({
-    name_ar: '',
-    currency: '',
-  });
+  const [dateFrom, setDateFrom] = useState(thirtyDaysAgo.toISOString().split('T')[0]);
+  const [dateTo, setDateTo] = useState(today.toISOString().split('T')[0]);
 
   useEffect(() => {
     if (currentBusiness) {
-      loadCountries();
+      loadData();
     }
-  }, [currentBusiness, searchValue]);
+  }, [currentBusiness, dateFrom, dateTo]);
 
-  const loadCountries = async () => {
+  const loadData = async () => {
     if (!currentBusiness) return;
 
     try {
       setIsLoading(true);
-      const data = await CountriesService.list(currentBusiness.id, {
-        search: searchValue || undefined,
+      const result = await PerformanceService.getCountryBreakdown(currentBusiness.id, {
+        date_from: dateFrom,
+        date_to: dateTo,
       });
-      setCountries(data);
+      setData(result);
     } catch (error) {
-      console.error('Failed to load countries:', error);
+      console.error('Failed to load country performance:', error);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleAdd = () => {
-    setEditingCountry(null);
-    setFormData({ name_ar: '', currency: '' });
-    setIsModalOpen(true);
-  };
+  const handleUpdateShippingCost = async (countryId: string, cost: number) => {
+    if (!currentBusiness) return;
 
-  const handleEdit = (id: string) => {
-    const country = countries.find((c) => c.id === id);
-    if (country) {
-      setEditingCountry(country);
-      setFormData({
-        name_ar: country.name_ar,
-        currency: country.currency || '',
+    try {
+      await CountriesService.update(currentBusiness.id, countryId, {
+        shipping_cost: cost,
       });
-      setIsModalOpen(true);
-    }
-  };
-
-  const handleSave = async () => {
-    if (!currentBusiness) return;
-
-    try {
-      setIsSaving(true);
-
-      if (editingCountry) {
-        await CountriesService.update(currentBusiness.id, editingCountry.id, formData);
-      } else {
-        await CountriesService.create(currentBusiness.id, formData);
-      }
-
-      await loadCountries();
-      setIsModalOpen(false);
+      await loadData();
     } catch (error) {
-      console.error('Failed to save country:', error);
-    } finally {
-      setIsSaving(false);
+      console.error('Failed to update shipping cost:', error);
     }
   };
-
-  const handleToggleActive = async (id: string, currentActive: boolean) => {
-    if (!currentBusiness) return;
-
-    try {
-      await CountriesService.toggleActive(currentBusiness.id, id, !currentActive);
-      await loadCountries();
-    } catch (error) {
-      console.error('Failed to toggle country status:', error);
-    }
-  };
-
-  const handleExport = async () => {
-    if (!currentBusiness) return;
-
-    try {
-      await CountriesService.exportCSV(currentBusiness.id, {
-        search: searchValue || undefined,
-      });
-    } catch (error) {
-      console.error('Failed to export countries:', error);
-    }
-  };
-
-  const handleImport = async (file: File) => {
-    if (!currentBusiness) return { success: 0, errors: [] };
-
-    const result = await CountriesService.importCSV(currentBusiness.id, file);
-    await loadCountries();
-    return result;
-  };
-
-  const columns: EntityColumn[] = [
-    { key: 'name_ar', label: 'الاسم' },
-    { key: 'currency', label: 'العملة' },
-  ];
 
   if (!currentBusiness) {
     return (
-      <>
-        <div className="text-center py-12">
-          <p className="text-zinc-600">لم يتم تحديد وورك سبيس</p>
-        </div>
-      </>
+      <div className="text-center py-12">
+        <p className="text-zinc-600">لم يتم تحديد وورك سبيس</p>
+      </div>
     );
   }
 
   return (
     <>
-      <EntityPageLayout
-        title="الدول والمناطق"
-        description="إدارة الدول والمناطق الجغرافية"
-        searchValue={searchValue}
-        onSearchChange={setSearchValue}
-        onAdd={handleAdd}
-        onExport={handleExport}
-        onImport={() => setIsImportOpen(true)}
-      >
-        <EntityTable
-          columns={columns}
-          data={countries}
-          onEdit={handleEdit}
-          onToggleActive={handleToggleActive}
-          isLoading={isLoading}
+      <PageHeader
+        title="أداء الدول والمناطق"
+        description="تحليل الأداء الجغرافي مع تكاليف الشحن والتوصيات"
+      />
+
+      <div className="mb-6">
+        <DateRangePicker
+          startDate={dateFrom}
+          endDate={dateTo}
+          onStartDateChange={setDateFrom}
+          onEndDateChange={setDateTo}
         />
-      </EntityPageLayout>
+      </div>
 
-      <EntityModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        title={editingCountry ? 'تعديل دولة' : 'إضافة دولة'}
-        onSave={handleSave}
-        isSaving={isSaving}
-      >
-        <div>
-          <label className="block text-sm font-medium text-zinc-700 mb-2">
-            اسم الدولة <span className="text-red-600">*</span>
-          </label>
-          <Input
-            value={formData.name_ar}
-            onChange={(e) => setFormData({ ...formData, name_ar: e.target.value })}
-            placeholder="مثال: مصر"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-zinc-700 mb-2">العملة</label>
-          <Input
-            value={formData.currency}
-            onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
-            placeholder="مثال: EGP"
-          />
-        </div>
-      </EntityModal>
-
-      <ImportModal
-        isOpen={isImportOpen}
-        onClose={() => setIsImportOpen(false)}
-        onImport={handleImport}
+      <CountriesPerformanceTable
+        data={data}
+        isLoading={isLoading}
+        onUpdateShippingCost={handleUpdateShippingCost}
       />
     </>
   );

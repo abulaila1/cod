@@ -1,189 +1,71 @@
 import { useState, useEffect } from 'react';
 import { useBusiness } from '@/contexts/BusinessContext';
-import { EmployeesService } from '@/services/employees.service';
-import { EntityPageLayout } from '@/components/entity/EntityPageLayout';
-import { EntityTable, EntityColumn } from '@/components/entity/EntityTable';
-import { EntityModal } from '@/components/entity/EntityModal';
-import { ImportModal } from '@/components/entity/ImportModal';
-import { Input } from '@/components/ui';
-import type { Employee } from '@/types/domain';
+import { PerformanceService } from '@/services/performance.service';
+import { PageHeader } from '@/components/common/PageHeader';
+import { EmployeesPerformanceTable } from '@/components/performance/EmployeesPerformanceTable';
+import { DateRangePicker } from '@/components/ui';
+import type { PerformanceBreakdown } from '@/types/performance';
 
 export function Employees() {
   const { currentBusiness } = useBusiness();
-  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [data, setData] = useState<PerformanceBreakdown[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [searchValue, setSearchValue] = useState('');
 
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isImportOpen, setIsImportOpen] = useState(false);
-  const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
+  const today = new Date();
+  const thirtyDaysAgo = new Date(today);
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-  const [formData, setFormData] = useState({
-    name_ar: '',
-    role: '',
-  });
+  const [dateFrom, setDateFrom] = useState(thirtyDaysAgo.toISOString().split('T')[0]);
+  const [dateTo, setDateTo] = useState(today.toISOString().split('T')[0]);
 
   useEffect(() => {
     if (currentBusiness) {
-      loadEmployees();
+      loadData();
     }
-  }, [currentBusiness, searchValue]);
+  }, [currentBusiness, dateFrom, dateTo]);
 
-  const loadEmployees = async () => {
+  const loadData = async () => {
     if (!currentBusiness) return;
 
     try {
       setIsLoading(true);
-      const data = await EmployeesService.list(currentBusiness.id, {
-        search: searchValue || undefined,
+      const result = await PerformanceService.getEmployeeBreakdown(currentBusiness.id, {
+        date_from: dateFrom,
+        date_to: dateTo,
       });
-      setEmployees(data);
+      setData(result);
     } catch (error) {
-      console.error('Failed to load employees:', error);
+      console.error('Failed to load employee performance:', error);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleAdd = () => {
-    setEditingEmployee(null);
-    setFormData({ name_ar: '', role: '' });
-    setIsModalOpen(true);
-  };
-
-  const handleEdit = (id: string) => {
-    const employee = employees.find((e) => e.id === id);
-    if (employee) {
-      setEditingEmployee(employee);
-      setFormData({
-        name_ar: employee.name_ar,
-        role: employee.role || '',
-      });
-      setIsModalOpen(true);
-    }
-  };
-
-  const handleSave = async () => {
-    if (!currentBusiness) return;
-
-    try {
-      setIsSaving(true);
-
-      if (editingEmployee) {
-        await EmployeesService.update(currentBusiness.id, editingEmployee.id, formData);
-      } else {
-        await EmployeesService.create(currentBusiness.id, formData);
-      }
-
-      await loadEmployees();
-      setIsModalOpen(false);
-    } catch (error) {
-      console.error('Failed to save employee:', error);
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleToggleActive = async (id: string, currentActive: boolean) => {
-    if (!currentBusiness) return;
-
-    try {
-      await EmployeesService.toggleActive(currentBusiness.id, id, !currentActive);
-      await loadEmployees();
-    } catch (error) {
-      console.error('Failed to toggle employee status:', error);
-    }
-  };
-
-  const handleExport = async () => {
-    if (!currentBusiness) return;
-
-    try {
-      await EmployeesService.exportCSV(currentBusiness.id, {
-        search: searchValue || undefined,
-      });
-    } catch (error) {
-      console.error('Failed to export employees:', error);
-    }
-  };
-
-  const handleImport = async (file: File) => {
-    if (!currentBusiness) return { success: 0, errors: [] };
-
-    const result = await EmployeesService.importCSV(currentBusiness.id, file);
-    await loadEmployees();
-    return result;
-  };
-
-  const columns: EntityColumn[] = [
-    { key: 'name_ar', label: 'الاسم' },
-    { key: 'role', label: 'الدور' },
-  ];
-
   if (!currentBusiness) {
     return (
-      <>
-        <div className="text-center py-12">
-          <p className="text-zinc-600">لم يتم تحديد وورك سبيس</p>
-        </div>
-      </>
+      <div className="text-center py-12">
+        <p className="text-zinc-600">لم يتم تحديد وورك سبيس</p>
+      </div>
     );
   }
 
   return (
     <>
-      <EntityPageLayout
-        title="الموظفين"
-        description="إدارة الموظفين والمسؤولين عن الطلبات"
-        searchValue={searchValue}
-        onSearchChange={setSearchValue}
-        onAdd={handleAdd}
-        onExport={handleExport}
-        onImport={() => setIsImportOpen(true)}
-      >
-        <EntityTable
-          columns={columns}
-          data={employees}
-          onEdit={handleEdit}
-          onToggleActive={handleToggleActive}
-          isLoading={isLoading}
-        />
-      </EntityPageLayout>
-
-      <EntityModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        title={editingEmployee ? 'تعديل موظف' : 'إضافة موظف'}
-        onSave={handleSave}
-        isSaving={isSaving}
-      >
-        <div>
-          <label className="block text-sm font-medium text-zinc-700 mb-2">
-            اسم الموظف <span className="text-red-600">*</span>
-          </label>
-          <Input
-            value={formData.name_ar}
-            onChange={(e) => setFormData({ ...formData, name_ar: e.target.value })}
-            placeholder="مثال: أحمد محمد"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-zinc-700 mb-2">الدور</label>
-          <Input
-            value={formData.role}
-            onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-            placeholder="مثال: موظف مبيعات"
-          />
-        </div>
-      </EntityModal>
-
-      <ImportModal
-        isOpen={isImportOpen}
-        onClose={() => setIsImportOpen(false)}
-        onImport={handleImport}
+      <PageHeader
+        title="أداء الموظفين"
+        description="تقييم أداء موظفي التأكيد مع نظام المكافآت"
       />
+
+      <div className="mb-6">
+        <DateRangePicker
+          startDate={dateFrom}
+          endDate={dateTo}
+          onStartDateChange={setDateFrom}
+          onEndDateChange={setDateTo}
+        />
+      </div>
+
+      <EmployeesPerformanceTable data={data} isLoading={isLoading} />
     </>
   );
 }
