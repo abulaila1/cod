@@ -15,16 +15,17 @@ import {
   Building2,
   Rocket,
   MessageCircle,
-  Copy,
   CheckCircle,
   Percent,
   ExternalLink,
   Banknote,
   ArrowRight,
+  Wallet,
+  Smartphone,
 } from 'lucide-react';
 import type { Billing, PlanType, PlanDetails } from '@/types/billing';
 import type { UsageStatus } from '@/services/usage.service';
-import { PLAN_CONFIG, BANK_DETAILS } from '@/types/billing';
+import { PLAN_CONFIG } from '@/types/billing';
 
 const PLANS: PlanDetails[] = [
   { key: 'starter', ...PLAN_CONFIG.starter },
@@ -62,7 +63,6 @@ export function Billing() {
   const [receiptRef, setReceiptRef] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
-  const [copiedField, setCopiedField] = useState<string | null>(null);
 
 
   const loadBillingData = useCallback(async () => {
@@ -111,12 +111,6 @@ export function Billing() {
 
     return () => clearInterval(interval);
   }, [timeRemaining, loadBillingData]);
-
-  const handleCopy = async (text: string, field: string) => {
-    await navigator.clipboard.writeText(text);
-    setCopiedField(field);
-    setTimeout(() => setCopiedField(null), 2000);
-  };
 
   const openPaymentModal = (plan: PlanDetails) => {
     setSelectedPlan(plan);
@@ -455,85 +449,64 @@ export function Billing() {
 
             <div>
               <h4 className="font-semibold text-zinc-900 mb-3 flex items-center gap-2">
-                <Banknote className="h-5 w-5 text-emerald-600" />
-                الدفع عبر التحويل البنكي
+                <Wallet className="h-5 w-5 text-emerald-600" />
+                طرق الدفع المحلية
               </h4>
 
-              <div className="bg-zinc-50 rounded-xl p-4 mb-4 space-y-3">
-                <p className="text-sm text-zinc-600 mb-3">
-                  حوّل المبلغ إلى حسابنا البنكي، ثم أكد التحويل
+              <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl p-4 mb-4 border border-emerald-100">
+                <p className="text-sm text-zinc-700 mb-4">
+                  ادفع بالطريقة المناسبة لك عبر التواصل معنا على واتساب
                 </p>
 
-                <div className="flex justify-between items-center p-3 bg-white rounded-lg border border-zinc-200">
-                  <div>
-                    <span className="text-xs text-zinc-500 block">البنك</span>
-                    <span className="font-medium text-zinc-900">{BANK_DETAILS.bankNameAr}</span>
+                <div className="grid grid-cols-2 gap-2 mb-4">
+                  <div className="flex items-center gap-2 bg-white rounded-lg p-3 border border-zinc-200">
+                    <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center">
+                      <Smartphone className="h-4 w-4 text-emerald-600" />
+                    </div>
+                    <span className="text-sm font-medium text-zinc-700">STC Pay</span>
                   </div>
-                  <button
-                    onClick={() => handleCopy(BANK_DETAILS.bankName, 'bank')}
-                    className="p-2 hover:bg-zinc-100 rounded-lg transition-colors"
-                  >
-                    {copiedField === 'bank' ? (
-                      <CheckCircle className="h-4 w-4 text-emerald-600" />
-                    ) : (
-                      <Copy className="h-4 w-4 text-zinc-400" />
-                    )}
-                  </button>
+                  <div className="flex items-center gap-2 bg-white rounded-lg p-3 border border-zinc-200">
+                    <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                      <Wallet className="h-4 w-4 text-blue-600" />
+                    </div>
+                    <span className="text-sm font-medium text-zinc-700">كليك</span>
+                  </div>
+                  <div className="flex items-center gap-2 bg-white rounded-lg p-3 border border-zinc-200">
+                    <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center">
+                      <Zap className="h-4 w-4 text-orange-600" />
+                    </div>
+                    <span className="text-sm font-medium text-zinc-700">انستا باي</span>
+                  </div>
+                  <div className="flex items-center gap-2 bg-white rounded-lg p-3 border border-zinc-200">
+                    <div className="w-8 h-8 bg-zinc-100 rounded-full flex items-center justify-center">
+                      <Banknote className="h-4 w-4 text-zinc-600" />
+                    </div>
+                    <span className="text-sm font-medium text-zinc-700">تحويل بنكي</span>
+                  </div>
                 </div>
 
-                <div className="flex justify-between items-center p-3 bg-white rounded-lg border border-zinc-200">
-                  <div>
-                    <span className="text-xs text-zinc-500 block">اسم الحساب</span>
-                    <span className="font-medium text-zinc-900">{BANK_DETAILS.accountName}</span>
-                  </div>
-                  <button
-                    onClick={() => handleCopy(BANK_DETAILS.accountName, 'name')}
-                    className="p-2 hover:bg-zinc-100 rounded-lg transition-colors"
-                  >
-                    {copiedField === 'name' ? (
-                      <CheckCircle className="h-4 w-4 text-emerald-600" />
-                    ) : (
-                      <Copy className="h-4 w-4 text-zinc-400" />
-                    )}
-                  </button>
-                </div>
-
-                <div className="flex justify-between items-center p-3 bg-white rounded-lg border border-zinc-200">
-                  <div>
-                    <span className="text-xs text-zinc-500 block">IBAN</span>
-                    <span className="font-medium font-mono text-sm text-zinc-900">{BANK_DETAILS.iban}</span>
-                  </div>
-                  <button
-                    onClick={() => handleCopy(BANK_DETAILS.iban, 'iban')}
-                    className="p-2 hover:bg-zinc-100 rounded-lg transition-colors"
-                  >
-                    {copiedField === 'iban' ? (
-                      <CheckCircle className="h-4 w-4 text-emerald-600" />
-                    ) : (
-                      <Copy className="h-4 w-4 text-zinc-400" />
-                    )}
-                  </button>
-                </div>
+                <Button
+                  variant="primary"
+                  className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 py-4 text-lg"
+                  onClick={handleWhatsAppClick}
+                >
+                  <MessageCircle className="h-6 w-6 ml-2" />
+                  تواصل معنا عبر واتساب
+                </Button>
+                <p className="text-xs text-zinc-500 text-center mt-2">
+                  سنرسل لك تفاصيل الدفع المناسبة لبلدك
+                </p>
               </div>
-
-              <Button
-                variant="outline"
-                className="w-full mb-3 border-green-500 text-green-600 hover:bg-green-50"
-                onClick={handleWhatsAppClick}
-              >
-                <MessageCircle className="h-5 w-5 ml-2" />
-                إرسال إثبات الدفع عبر واتساب
-              </Button>
 
               <div className="space-y-3">
                 <Input
                   value={receiptRef}
                   onChange={(e) => setReceiptRef(e.target.value)}
-                  placeholder="رقم الحوالة / اسم المحوّل (اختياري)"
+                  placeholder="اسمك أو رقم الهاتف (اختياري)"
                 />
                 <Button
-                  variant="primary"
-                  className="w-full bg-emerald-600 hover:bg-emerald-700"
+                  variant="outline"
+                  className="w-full border-emerald-500 text-emerald-600 hover:bg-emerald-50"
                   onClick={handleSubmitManualPayment}
                   disabled={isProcessing}
                 >
@@ -542,7 +515,7 @@ export function Billing() {
                   ) : (
                     <>
                       <CheckCircle className="h-5 w-5 ml-2" />
-                      لقد قمت بالتحويل
+                      لقد تواصلت معكم
                     </>
                   )}
                 </Button>
