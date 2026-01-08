@@ -60,7 +60,33 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
         .eq('user_id', user!.id)
         .eq('status', 'active');
 
-      if (memberError) throw memberError;
+      if (memberError) {
+        console.error('Error querying business_members:', memberError);
+
+        if (memberError.code === 'PGRST116') {
+          setError('لم يتم العثور على أي بيانات. سيتم إنشاء عمل جديد تلقائياً.');
+        } else if (memberError.message.includes('permission')) {
+          setError('خطأ في الأذونات. يرجى تسجيل الخروج ثم الدخول مرة أخرى.');
+        } else {
+          setError(`خطأ في تحميل البيانات: ${memberError.message}`);
+        }
+
+        setBusinesses([]);
+        setCurrentBusiness(null);
+        setMembership(null);
+        setIsLoading(false);
+        return;
+      }
+
+      if (!memberships || memberships.length === 0) {
+        console.warn('User has no business memberships');
+        setError('لم يتم العثور على أي عمل. سيتم إنشاء عمل جديد تلقائياً.');
+        setBusinesses([]);
+        setCurrentBusiness(null);
+        setMembership(null);
+        setIsLoading(false);
+        return;
+      }
 
       const businessList = memberships
         ?.map(m => m.businesses)
@@ -78,8 +104,11 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
         localStorage.setItem('currentBusinessId', businessToSelect.id);
       }
     } catch (err) {
-      console.error('Error loading businesses:', err);
-      setError(err instanceof Error ? err.message : 'فشل تحميل بيانات العمل');
+      console.error('Unexpected error loading businesses:', err);
+      setError(err instanceof Error ? err.message : 'حدث خطأ غير متوقع');
+      setBusinesses([]);
+      setCurrentBusiness(null);
+      setMembership(null);
     } finally {
       setIsLoading(false);
     }

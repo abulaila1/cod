@@ -36,14 +36,36 @@ export function Login() {
       const { error } = await signIn(email, password);
 
       if (error) {
-        throw error;
+        console.error('Login error:', error);
+
+        let message = 'فشل تسجيل الدخول';
+
+        if (error.message.includes('Invalid login credentials')) {
+          message = 'البريد الإلكتروني أو كلمة المرور غير صحيحة';
+        } else if (error.message.includes('Email not confirmed')) {
+          message = 'يرجى تأكيد بريدك الإلكتروني أولاً. تحقق من صندوق الوارد الخاص بك.';
+        } else if (error.message.includes('User not found')) {
+          message = 'لم يتم العثور على حساب بهذا البريد الإلكتروني';
+        } else if (error.message.includes('rate limit')) {
+          message = 'تم تجاوز عدد المحاولات المسموحة. يرجى الانتظار والمحاولة لاحقاً.';
+        } else if (error.message.includes('Network')) {
+          message = 'خطأ في الاتصال بالشبكة. تحقق من اتصالك بالإنترنت.';
+        } else if (error.message) {
+          message = `خطأ: ${error.message}`;
+        }
+
+        setErrorMessage(message);
+        return;
       }
 
       navigate('/auth/callback');
     } catch (error: any) {
-      const message = error.message?.includes('Invalid login')
-        ? 'البريد الإلكتروني أو كلمة المرور غير صحيحة'
-        : 'فشل تسجيل الدخول';
+      console.error('Unexpected login error:', error);
+
+      const message = error?.message
+        ? `خطأ غير متوقع: ${error.message}`
+        : 'حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى.';
+
       setErrorMessage(message);
     } finally {
       setIsLoading(false);

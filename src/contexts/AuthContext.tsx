@@ -13,11 +13,13 @@ interface AuthContextValue {
   session: Session | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  error: string | null;
   signUp: (email: string, password: string, name: string) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: Error | null }>;
   updatePassword: (newPassword: string) => Promise<{ error: Error | null }>;
+  verifyBusinessAccess: () => Promise<{ hasAccess: boolean; error: string | null }>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -26,6 +28,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     initializeAuth();
@@ -52,6 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const handleSessionChange = (session: Session | null) => {
     setSession(session);
+    setError(null);
 
     if (session?.user) {
       setUser({
@@ -61,6 +65,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
     } else {
       setUser(null);
+    }
+  };
+
+  const verifyBusinessAccess = async (): Promise<{ hasAccess: boolean; error: string | null }> => {
+    try {
+      if (!user) {
+        return { hasAccess: false, error: 'لم يتم تسجيل الدخول' };
+      }
+
+      const { data, error: queryError } = await supabase
+        .from('business_members')
+        .select('id, business_id, role, status')
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .maybeSingle();
+
+      if (queryError) {
+        console.error('Error verifying business access:', queryError);
+        return {
+          hasAccess: false,
+          error: `خطأ في الوصول إلى البيانات: ${queryError.message}`
+        };
+      }
+
+      if (!data) {
+        return {
+          hasAccess: false,
+          error: 'لم يتم العثور على أي عمل مرتبط بحسابك. سيتم إنشاء عمل جديد تلقائياً.'
+        };
+      }
+
+      return { hasAccess: true, error: null };
+    } catch (err) {
+      console.error('Unexpected error in verifyBusinessAccess:', err);
+      return {
+        hasAccess: false,
+        error: err instanceof Error ? err.message : 'خطأ غير متوقع'
+      };
     }
   };
 
@@ -144,11 +186,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         session,
         isAuthenticated: !!user && !!session,
         isLoading,
+        error,
         signUp,
         signIn,
         signOut,
         resetPassword,
         updatePassword,
+        verifyBusinessAccess,
       }}
     >
       {children}

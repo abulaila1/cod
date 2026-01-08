@@ -80,7 +80,8 @@ export function AuthCallback() {
       const business = await ensureWorkspace();
 
       if (!business) {
-        throw new Error('فشل إنشاء الوورك سبيس');
+        console.error('ensureWorkspace returned null');
+        throw new Error('فشل إنشاء الوورك سبيس. يرجى المحاولة مرة أخرى.');
       }
 
       await refreshBusinesses();
@@ -89,7 +90,22 @@ export function AuthCallback() {
     } catch (err) {
       console.error('Error provisioning workspace:', err);
       setStatus('error');
-      setError(err instanceof Error ? err.message : 'فشل إعداد الوورك سبيس');
+
+      let errorMessage = 'فشل إعداد الوورك سبيس';
+
+      if (err instanceof Error) {
+        if (err.message.includes('permission')) {
+          errorMessage = 'خطأ في الأذونات. يرجى تسجيل الخروج ثم الدخول مرة أخرى.';
+        } else if (err.message.includes('timeout') || err.message.includes('انتهت مهلة')) {
+          errorMessage = 'انتهت مهلة الانتظار. يرجى المحاولة مرة أخرى.';
+        } else if (err.message.includes('network')) {
+          errorMessage = 'خطأ في الاتصال بالشبكة. تحقق من اتصالك بالإنترنت.';
+        } else {
+          errorMessage = err.message;
+        }
+      }
+
+      setError(errorMessage);
     }
   };
 
