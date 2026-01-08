@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { ProductsService } from '@/services/products.service';
+import { supabase } from '@/services/supabase';
 import type { Product, ProductCategory } from '@/types/domain';
 import { Card, CardContent, Button, Input, Modal, Select, Badge } from '@/components/ui';
 import {
@@ -11,14 +12,16 @@ import {
   Package,
   Upload,
   Download,
-  Filter,
   Grid3X3,
   List,
-  Tag,
-  Image as ImageIcon,
   X,
   FolderPlus,
+  ImagePlus,
+  AlertCircle,
 } from 'lucide-react';
+
+const MAX_FILE_SIZE = 5 * 1024 * 1024;
+const ALLOWED_TYPE = 'image/jpeg';
 
 const CATEGORY_COLORS = [
   '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#06B6D4', '#84CC16'
@@ -41,6 +44,7 @@ export function Products() {
   const [editingCategory, setEditingCategory] = useState<ProductCategory | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   const [productForm, setProductForm] = useState({
     name_ar: '',
@@ -52,6 +56,11 @@ export function Products() {
     category_id: '',
     image_url: '',
   });
+
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageError, setImageError] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   const [categoryForm, setCategoryForm] = useState({
     name_ar: '',
@@ -108,6 +117,74 @@ export function Products() {
       image_url: '',
     });
     setEditingProduct(null);
+    setSelectedImage(null);
+    setImagePreview(null);
+    setImageError(null);
+  };
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    setImageError(null);
+
+    if (!file) {
+      setSelectedImage(null);
+      setImagePreview(null);
+      return;
+    }
+
+    if (file.type !== ALLOWED_TYPE) {
+      setImageError('يُسمح فقط بصور بصيغة JPG');
+      setSelectedImage(null);
+      setImagePreview(null);
+      if (imageInputRef.current) imageInputRef.current.value = '';
+      return;
+    }
+
+    if (file.size > MAX_FILE_SIZE) {
+      setImageError('حجم الصورة يجب أن لا يتجاوز 5 ميجابايت');
+      setSelectedImage(null);
+      setImagePreview(null);
+      if (imageInputRef.current) imageInputRef.current.value = '';
+      return;
+    }
+
+    setSelectedImage(file);
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setImagePreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const uploadImage = async (file: File): Promise<string | null> => {
+    const timestamp = Date.now();
+    const random = Math.random().toString(36).substring(2, 8);
+    const fileName = `${currentBusiness?.id}/${timestamp}-${random}.jpg`;
+
+    const { data, error } = await supabase.storage
+      .from('products')
+      .upload(fileName, file, {
+        contentType: 'image/jpeg',
+        upsert: false,
+      });
+
+    if (error) {
+      console.error('Upload error:', error);
+      return null;
+    }
+
+    const { data: urlData } = supabase.storage
+      .from('products')
+      .getPublicUrl(data.path);
+
+    return urlData.publicUrl;
+  };
+
+  const removeCurrentImage = () => {
+    setSelectedImage(null);
+    setImagePreview(null);
+    setProductForm({ ...productForm, image_url: '' });
+    if (imageInputRef.current) imageInputRef.current.value = '';
   };
 
   const resetCategoryForm = () => {
@@ -127,6 +204,9 @@ export function Products() {
       category_id: product.category_id || '',
       image_url: product.image_url || '',
     });
+    setSelectedImage(null);
+    setImagePreview(product.image_url || null);
+    setImageError(null);
     setShowProductModal(true);
   };
 
@@ -144,6 +224,20 @@ export function Products() {
     if (!currentBusiness || !productForm.name_ar) return;
 
     try {
+      setIsUploading(true);
+      let imageUrl = productForm.image_url;
+
+      if (selectedImage) {
+        const uploadedUrl = await uploadImage(selectedImage);
+        if (uploadedUrl) {
+          imageUrl = uploadedUrl;
+        } else {
+          alert('فشل رفع الصورة');
+          setIsUploading(false);
+          return;
+        }
+      }
+
       if (editingProduct) {
         await ProductsService.update(currentBusiness.id, editingProduct.id, {
           name_ar: productForm.name_ar,
@@ -153,7 +247,7 @@ export function Products() {
           cost: productForm.cost,
           physical_stock: productForm.physical_stock,
           category_id: productForm.category_id || null,
-          image_url: productForm.image_url || null,
+          image_url: imageUrl || null,
         });
       } else {
         await ProductsService.create(currentBusiness.id, {
@@ -164,7 +258,7 @@ export function Products() {
           cost: productForm.cost,
           physical_stock: productForm.physical_stock,
           category_id: productForm.category_id || undefined,
-          image_url: productForm.image_url,
+          image_url: imageUrl,
         });
       }
       setShowProductModal(false);
@@ -173,6 +267,8 @@ export function Products() {
     } catch (error) {
       console.error('Failed to save product:', error);
       alert('فشل حفظ المنتج');
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -664,22 +760,59 @@ export function Products() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-zinc-700 mb-2">رابط صورة المنتج</label>
-              <Input
-                placeholder="https://example.com/image.jpg"
-                value={productForm.image_url}
-                onChange={(e) => setProductForm({ ...productForm, image_url: e.target.value })}
+              <label className="block text-sm font-medium text-zinc-700 mb-2">صورة المنتج</label>
+              <input
+                type="file"
+                ref={imageInputRef}
+                onChange={handleImageSelect}
+                accept=".jpg,.jpeg"
+                className="hidden"
               />
-              {productForm.image_url && (
-                <div className="mt-2 relative w-24 h-24 rounded-lg overflow-hidden bg-zinc-100">
-                  <img
-                    src={productForm.image_url}
-                    alt="Preview"
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).style.display = 'none';
-                    }}
-                  />
+
+              {imagePreview ? (
+                <div className="relative w-full max-w-xs">
+                  <div className="aspect-square rounded-xl overflow-hidden bg-zinc-100 border-2 border-zinc-200">
+                    <img
+                      src={imagePreview}
+                      alt="Preview"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={removeCurrentImage}
+                    className="absolute -top-2 -right-2 p-1.5 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors shadow-lg"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => imageInputRef.current?.click()}
+                    className="absolute bottom-2 left-2 px-3 py-1.5 bg-white/90 backdrop-blur text-zinc-700 rounded-lg text-sm font-medium hover:bg-white transition-colors shadow-lg"
+                  >
+                    تغيير الصورة
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => imageInputRef.current?.click()}
+                  className="w-full max-w-xs aspect-square rounded-xl border-2 border-dashed border-zinc-300 hover:border-emerald-400 bg-zinc-50 hover:bg-emerald-50/50 transition-all flex flex-col items-center justify-center gap-3 group"
+                >
+                  <div className="p-4 rounded-full bg-zinc-100 group-hover:bg-emerald-100 transition-colors">
+                    <ImagePlus className="h-8 w-8 text-zinc-400 group-hover:text-emerald-500 transition-colors" />
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm font-medium text-zinc-700">اضغط لرفع صورة</p>
+                    <p className="text-xs text-zinc-500 mt-1">JPG فقط، الحد الأقصى 5 ميجابايت</p>
+                  </div>
+                </button>
+              )}
+
+              {imageError && (
+                <div className="mt-2 flex items-center gap-2 text-red-500 text-sm">
+                  <AlertCircle className="h-4 w-4" />
+                  {imageError}
                 </div>
               )}
             </div>
@@ -691,15 +824,16 @@ export function Products() {
                   setShowProductModal(false);
                   resetProductForm();
                 }}
+                disabled={isUploading}
               >
                 إلغاء
               </Button>
               <Button
                 variant="accent"
                 onClick={handleSaveProduct}
-                disabled={!productForm.name_ar}
+                disabled={!productForm.name_ar || isUploading}
               >
-                {editingProduct ? 'حفظ التغييرات' : 'إضافة المنتج'}
+                {isUploading ? 'جاري الحفظ...' : editingProduct ? 'حفظ التغييرات' : 'إضافة المنتج'}
               </Button>
             </div>
           </div>
