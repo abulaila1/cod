@@ -1,4 +1,3 @@
-import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ToastProvider } from '@/components/ui';
 import { AuthProvider } from '@/contexts/AuthContext';
@@ -17,8 +16,7 @@ import { CheckEmail } from '@/pages/auth/CheckEmail';
 import { AuthCallback } from '@/pages/auth/AuthCallback';
 import { Onboarding } from '@/pages/auth/Onboarding';
 
-// Lazy load Dashboard to prevent Recharts from crashing the main bundle
-const Dashboard = React.lazy(() => import('@/pages/app/Dashboard').then(module => ({ default: module.Dashboard })));
+import { Dashboard } from '@/pages/app/Dashboard';
 import { Orders } from '@/pages/app/Orders';
 import { Products } from '@/pages/app/Products';
 import { Carriers } from '@/pages/app/Carriers';
@@ -82,14 +80,7 @@ function App() {
                   }
                 >
                   <Route index element={<Navigate to="/app/dashboard" replace />} />
-                  <Route
-                    path="dashboard"
-                    element={
-                      <React.Suspense fallback={<div className="p-8 text-center">جاري تحميل اللوحة...</div>}>
-                        <Dashboard />
-                      </React.Suspense>
-                    }
-                  />
+                  <Route path="dashboard" element={<Dashboard />} />
                   <Route path="orders" element={<Orders />} />
                   <Route path="products" element={<Products />} />
                   <Route path="carriers" element={<Carriers />} />

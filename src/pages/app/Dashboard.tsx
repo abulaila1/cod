@@ -26,17 +26,17 @@ const formatCurrency = (amount: number, currency = 'USD') => {
 
 export function Dashboard() {
   const { currentBusiness } = useBusiness();
-  const { orders, isLoading } = useOrdersList();
+  const { orders, isLoading } = useOrdersList(currentBusiness?.id);
 
   const metrics = useMemo(() => {
     const safeOrders = orders || [];
 
     const totalOrders = safeOrders.length;
-    const delivered = safeOrders.filter(o => o.status === 'delivered').length;
-    const returned = safeOrders.filter(o => o.status === 'returned').length;
+    const delivered = safeOrders.filter(o => o.status?.counts_as_delivered).length;
+    const returned = safeOrders.filter(o => o.status?.counts_as_return).length;
 
-    const totalRevenue = safeOrders.reduce((sum, o) => sum + (Number(o.total_amount) || 0), 0);
-    const netProfit = safeOrders.reduce((sum, o) => sum + ((Number(o.total_amount) || 0) - (Number(o.shipping_cost) || 0)), 0);
+    const totalRevenue = safeOrders.reduce((sum, o) => sum + (Number(o.revenue) || 0), 0);
+    const netProfit = safeOrders.reduce((sum, o) => sum + ((Number(o.revenue) || 0) - (Number(o.shipping_cost) || 0) - (Number(o.cogs) || 0)), 0);
 
     const deliveryRate = totalOrders ? Math.round((delivered / totalOrders) * 100) : 0;
     const returnRate = totalOrders ? Math.round((returned / totalOrders) * 100) : 0;
@@ -50,26 +50,24 @@ export function Dashboard() {
 
     return safeOrders.slice(0, 10).map((o) => ({
       date: new Date(o.created_at).toLocaleDateString(),
-      sales: Number(o.total_amount) || 0,
-      profit: (Number(o.total_amount) || 0) * 0.3
+      sales: Number(o.revenue) || 0,
+      profit: (Number(o.revenue) || 0) - (Number(o.cogs) || 0)
     }));
   }, [orders]);
 
   const statusData = useMemo(() => {
     const safeOrders = orders || [];
-    const stats = { delivered: 0, returned: 0, pending: 0, shipping: 0 };
+    const stats = { delivered: 0, returned: 0, active: 0 };
     safeOrders.forEach(o => {
-      if (o.status === 'delivered') stats.delivered++;
-      else if (o.status === 'returned') stats.returned++;
-      else if (o.status === 'pending') stats.pending++;
-      else stats.shipping++;
+      if (o.status?.counts_as_delivered) stats.delivered++;
+      else if (o.status?.counts_as_return) stats.returned++;
+      else if (o.status?.counts_as_active) stats.active++;
     });
 
     const data = [
       { name: 'تم التسليم', value: stats.delivered, color: '#10B981' },
       { name: 'مرتجع', value: stats.returned, color: '#EF4444' },
-      { name: 'قيد الشحن', value: stats.shipping, color: '#3B82F6' },
-      { name: 'معلق', value: stats.pending, color: '#F59E0B' },
+      { name: 'نشط', value: stats.active, color: '#3B82F6' },
     ].filter(d => d.value > 0);
 
     return data.length > 0 ? data : [{ name: 'لا يوجد بيانات', value: 1, color: '#E5E7EB' }];
