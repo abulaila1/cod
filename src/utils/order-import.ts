@@ -6,7 +6,15 @@ export const REQUIRED_ORDER_HEADERS = [
   'Product Name',
   'Quantity',
   'Price',
+] as const;
+
+export const OPTIONAL_ORDER_HEADERS = [
   'Notes',
+] as const;
+
+export const ALL_ORDER_HEADERS = [
+  ...REQUIRED_ORDER_HEADERS,
+  ...OPTIONAL_ORDER_HEADERS,
 ] as const;
 
 export const REQUIRED_ORDER_HEADERS_AR = [
@@ -17,6 +25,9 @@ export const REQUIRED_ORDER_HEADERS_AR = [
   'اسم المنتج',
   'الكمية',
   'السعر',
+] as const;
+
+export const OPTIONAL_ORDER_HEADERS_AR = [
   'ملاحظات',
 ] as const;
 
@@ -28,16 +39,23 @@ export interface OrderImportRow {
   productName: string;
   quantity: number;
   price: number;
-  notes: string;
+  notes?: string;
 }
 
-export function validateOrderHeaders(headers: string[]): { valid: boolean; missing: string[]; found: string[] } {
-  const normalizedHeaders = headers.map((h) => h.trim().toLowerCase());
+export function validateOrderHeaders(headers: string[]): {
+  valid: boolean;
+  missing: string[];
+  found: string[];
+  optional: string[];
+} {
+  const normalizedHeaders = headers.map((h) => h.trim().toLowerCase().replace(/\s+/g, ' '));
   const missing: string[] = [];
   const found: string[] = [];
+  const optional: string[] = [];
 
   for (const required of REQUIRED_ORDER_HEADERS) {
-    const isFound = normalizedHeaders.some((h) => h === required.toLowerCase());
+    const normalizedRequired = required.toLowerCase().trim().replace(/\s+/g, ' ');
+    const isFound = normalizedHeaders.some((h) => h === normalizedRequired);
     if (!isFound) {
       missing.push(required);
     } else {
@@ -45,17 +63,26 @@ export function validateOrderHeaders(headers: string[]): { valid: boolean; missi
     }
   }
 
+  for (const opt of OPTIONAL_ORDER_HEADERS) {
+    const normalizedOpt = opt.toLowerCase().trim().replace(/\s+/g, ' ');
+    const isFound = normalizedHeaders.some((h) => h === normalizedOpt);
+    if (isFound) {
+      optional.push(opt);
+    }
+  }
+
   return {
     valid: missing.length === 0,
     missing,
     found,
+    optional,
   };
 }
 
 export function generateOrderTemplate(): string {
   const BOM = '\uFEFF';
 
-  const headers = REQUIRED_ORDER_HEADERS.join(',');
+  const headers = ALL_ORDER_HEADERS.join(',');
 
   const exampleRow = [
     'أحمد محمد',
@@ -77,7 +104,7 @@ export function parseOrderImportRow(
 ): OrderImportRow | null {
   const row: Partial<OrderImportRow> = {};
 
-  const normalizedHeaders = headers.map((h) => h.trim().toLowerCase());
+  const normalizedHeaders = headers.map((h) => h.trim().toLowerCase().replace(/\s+/g, ' '));
 
   for (let i = 0; i < headers.length; i++) {
     const header = normalizedHeaders[i];
@@ -106,7 +133,7 @@ export function parseOrderImportRow(
         row.price = parseFloat(value) || 0;
         break;
       case 'notes':
-        row.notes = value;
+        row.notes = value || '';
         break;
     }
   }
@@ -119,6 +146,10 @@ export function parseOrderImportRow(
     !row.productName
   ) {
     return null;
+  }
+
+  if (!row.notes) {
+    row.notes = '';
   }
 
   return row as OrderImportRow;

@@ -24,9 +24,17 @@ export async function parseImportFile(file: File): Promise<ParsedFileData> {
   }
 
   const headers = rows[0].map((h) => String(h || '').trim());
-  const dataRows = rows.slice(1).map((row) =>
-    row.map((cell) => String(cell || '').trim())
-  );
+  const headerCount = headers.length;
+
+  const dataRows = rows.slice(1).map((row) => {
+    const normalizedRow = row.map((cell) => String(cell || '').trim());
+
+    while (normalizedRow.length < headerCount) {
+      normalizedRow.push('');
+    }
+
+    return normalizedRow;
+  });
 
   return {
     rows,

@@ -124,11 +124,18 @@ export function Orders() {
       const validation = validateOrderHeaders(parsed.headers);
 
       if (!validation.valid) {
+        const optionalNote = validation.optional.length > 0
+          ? `\n\nأعمدة اختيارية موجودة: ${validation.optional.join(', ')}`
+          : '';
+
         throw new Error(
           `تنسيق الملف غير صحيح. يرجى استخدام القالب الرسمي.\n\n` +
-          `✓ الأعمدة الموجودة (${validation.found.length}): ${validation.found.join(', ')}\n\n` +
-          `✗ الأعمدة المفقودة (${validation.missing.length}): ${validation.missing.join(', ')}\n\n` +
-          `الأعمدة المطلوبة بالترتيب:\nCustomer Name, Phone Number, Governorate, City/Address, Product Name, Quantity, Price, Notes`
+          `✓ الأعمدة المطلوبة الموجودة (${validation.found.length}):\n${validation.found.join(', ')}\n\n` +
+          `✗ الأعمدة المطلوبة المفقودة (${validation.missing.length}):\n${validation.missing.join(', ')}` +
+          optionalNote + `\n\n` +
+          `━━━━━━━━━━━━━━━━━━━━\n\n` +
+          `الأعمدة المطلوبة (إلزامية):\nCustomer Name, Phone Number, Governorate, City/Address, Product Name, Quantity, Price\n\n` +
+          `الأعمدة الاختيارية:\nNotes (يمكن تركها فارغة)`
         );
       }
 
