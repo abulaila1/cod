@@ -53,13 +53,37 @@ export function validateOrderHeaders(headers: string[]): {
   const found: string[] = [];
   const optional: string[] = [];
 
+  const criticalColumns = ['customer name', 'product name', 'price'];
+  const hasCritical = criticalColumns.every(col =>
+    normalizedHeaders.some(h => h.includes(col))
+  );
+
+  if (!hasCritical) {
+    const missingCritical = criticalColumns.filter(col =>
+      !normalizedHeaders.some(h => h.includes(col))
+    );
+    return {
+      valid: false,
+      missing: missingCritical.map(col => {
+        switch(col) {
+          case 'customer name': return 'Customer Name';
+          case 'product name': return 'Product Name';
+          case 'price': return 'Price';
+          default: return col;
+        }
+      }),
+      found: headers,
+      optional: [],
+    };
+  }
+
   for (const required of REQUIRED_ORDER_HEADERS) {
     const normalizedRequired = required.toLowerCase().trim().replace(/\s+/g, ' ');
-    const isFound = normalizedHeaders.some((h) => h === normalizedRequired);
-    if (!isFound) {
-      missing.push(required);
-    } else {
+    const isFound = normalizedHeaders.some((h) => h === normalizedRequired || h.includes(normalizedRequired.split(' ')[0]));
+    if (isFound) {
       found.push(required);
+    } else {
+      missing.push(required);
     }
   }
 
@@ -72,7 +96,7 @@ export function validateOrderHeaders(headers: string[]): {
   }
 
   return {
-    valid: missing.length === 0,
+    valid: hasCritical,
     missing,
     found,
     optional,
