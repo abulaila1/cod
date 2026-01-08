@@ -1,58 +1,161 @@
 import { supabase } from './supabase';
 import { AuditService } from './audit.service';
-import { exportToCSV } from '@/utils/csv';
-import { exportToExcel } from '@/utils/excel';
-import { parseImportFile } from '@/utils/file-parser';
-import type { Country } from '@/types/domain';
 
-export interface CountryFilters {
+export interface Country {
+  id: string;
+  business_id: string;
+  name_ar: string;
+  name_en?: string;
+  code: string;
+  currency: string;
+  currency_symbol: string;
+  shipping_cost: number;
+  is_active: boolean;
+  created_at?: string;
+}
+
+export interface City {
+  id: string;
+  business_id: string;
+  country_id: string;
+  name_ar: string;
+  name_en?: string;
+  shipping_cost: number;
+  is_active: boolean;
+  created_at?: string;
+}
+
+export interface CityFilters {
   search?: string;
   activeOnly?: boolean;
-  sort?: 'name_ar' | 'created_at';
-  sortDirection?: 'asc' | 'desc';
-}
-
-export interface CreateCountryInput {
-  name_ar: string;
-  currency?: string;
-}
-
-export interface UpdateCountryInput {
-  name_ar?: string;
-  currency?: string;
 }
 
 export class CountriesService {
-  static async list(businessId: string, filters: CountryFilters = {}): Promise<Country[]> {
-    let query = supabase.from('countries').select('*').eq('business_id', businessId);
+  static async getCountry(businessId: string): Promise<Country | null> {
+    const { data, error } = await supabase
+      .from('countries')
+      .select('*')
+      .eq('business_id', businessId)
+      .limit(1)
+      .maybeSingle();
 
-    if (filters.activeOnly !== undefined) {
-      query = query.eq('active', filters.activeOnly);
+    if (error) throw error;
+    return data;
+  }
+
+  static async createOrUpdateCountry(
+    businessId: string,
+    input: {
+      name_ar: string;
+      name_en?: string;
+      code: string;
+      currency: string;
+      currency_symbol: string;
+    }
+  ): Promise<Country> {
+    const existing = await this.getCountry(businessId);
+
+    if (existing) {
+      const { data, error } = await supabase
+        .from('countries')
+        .update({
+          name_ar: input.name_ar,
+          name_en: input.name_en || input.name_ar,
+          code: input.code,
+          currency: input.currency,
+          currency_symbol: input.currency_symbol,
+        })
+        .eq('id', existing.id)
+        .eq('business_id', businessId)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      await AuditService.log({
+        business_id: businessId,
+        entity_type: 'countries',
+        entity_id: data.id,
+        action: 'update',
+        changes: { before: existing, after: data },
+      });
+
+      return data;
+    } else {
+      const { data, error } = await supabase
+        .from('countries')
+        .insert({
+          business_id: businessId,
+          name_ar: input.name_ar,
+          name_en: input.name_en || input.name_ar,
+          code: input.code,
+          currency: input.currency,
+          currency_symbol: input.currency_symbol,
+          is_active: true,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      await AuditService.log({
+        business_id: businessId,
+        entity_type: 'countries',
+        entity_id: data.id,
+        action: 'create',
+        changes: { created: data },
+      });
+
+      return data;
+    }
+  }
+
+  static async listCities(businessId: string, filters: CityFilters = {}): Promise<City[]> {
+    const country = await this.getCountry(businessId);
+    if (!country) return [];
+
+    let query = supabase
+      .from('cities')
+      .select('*')
+      .eq('business_id', businessId)
+      .eq('country_id', country.id);
+
+    if (filters.activeOnly) {
+      query = query.eq('is_active', true);
     }
 
     if (filters.search) {
-      query = query.ilike('name_ar', `%${filters.search}%`);
+      query = query.or(`name_ar.ilike.%${filters.search}%,name_en.ilike.%${filters.search}%`);
     }
 
-    const sortField = filters.sort || 'created_at';
-    const sortDir = filters.sortDirection || 'desc';
-    query = query.order(sortField, { ascending: sortDir === 'asc' });
+    query = query.order('name_ar', { ascending: true });
 
     const { data, error } = await query;
 
     if (error) throw error;
-
     return data || [];
   }
 
-  static async create(businessId: string, input: CreateCountryInput): Promise<Country> {
+  static async createCity(
+    businessId: string,
+    input: {
+      name_ar: string;
+      name_en?: string;
+      shipping_cost: number;
+    }
+  ): Promise<City> {
+    const country = await this.getCountry(businessId);
+    if (!country) throw new Error('يجب إعداد الدولة أولاً');
+
     const { data, error } = await supabase
-      .from('countries')
+      .from('cities')
       .insert({
         business_id: businessId,
+        country_id: country.id,
         name_ar: input.name_ar,
-        currency: input.currency || null,
-        active: true,
+        name_en: input.name_en || null,
+        shipping_cost: input.shipping_cost || 0,
+        is_active: true,
       })
       .select()
       .single();
@@ -61,7 +164,7 @@ export class CountriesService {
 
     await AuditService.log({
       business_id: businessId,
-      entity_type: 'countries',
+      entity_type: 'cities',
       entity_id: data.id,
       action: 'create',
       changes: { created: data },
@@ -70,18 +173,82 @@ export class CountriesService {
     return data;
   }
 
-  static async update(
+  static async updateCity(
     businessId: string,
-    countryId: string,
-    input: UpdateCountryInput
-  ): Promise<Country> {
+    cityId: string,
+    input: {
+      name_ar?: string;
+      name_en?: string;
+      shipping_cost?: number;
+      is_active?: boolean;
+    }
+  ): Promise<City> {
     const { data: before } = await supabase
-      .from('countries')
+      .from('cities')
       .select('*')
-      .eq('id', countryId)
+      .eq('id', cityId)
       .eq('business_id', businessId)
       .single();
 
+    const { data, error } = await supabase
+      .from('cities')
+      .update(input)
+      .eq('id', cityId)
+      .eq('business_id', businessId)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    await AuditService.log({
+      business_id: businessId,
+      entity_type: 'cities',
+      entity_id: cityId,
+      action: 'update',
+      changes: { before, after: data },
+    });
+
+    return data;
+  }
+
+  static async deleteCity(businessId: string, cityId: string): Promise<void> {
+    const { data: before } = await supabase
+      .from('cities')
+      .select('*')
+      .eq('id', cityId)
+      .eq('business_id', businessId)
+      .single();
+
+    const { error } = await supabase
+      .from('cities')
+      .delete()
+      .eq('id', cityId)
+      .eq('business_id', businessId);
+
+    if (error) throw error;
+
+    await AuditService.log({
+      business_id: businessId,
+      entity_type: 'cities',
+      entity_id: cityId,
+      action: 'delete',
+      changes: { deleted: before },
+    });
+  }
+
+  static async toggleCityActive(
+    businessId: string,
+    cityId: string,
+    isActive: boolean
+  ): Promise<City> {
+    return this.updateCity(businessId, cityId, { is_active: isActive });
+  }
+
+  static async update(
+    businessId: string,
+    countryId: string,
+    input: { shipping_cost?: number }
+  ): Promise<Country> {
     const { data, error } = await supabase
       .from('countries')
       .update(input)
@@ -91,106 +258,6 @@ export class CountriesService {
       .single();
 
     if (error) throw error;
-
-    await AuditService.log({
-      business_id: businessId,
-      entity_type: 'countries',
-      entity_id: countryId,
-      action: 'update',
-      changes: { before, after: data },
-    });
-
     return data;
-  }
-
-  static async toggleActive(
-    businessId: string,
-    countryId: string,
-    active: boolean
-  ): Promise<Country> {
-    const { data: before } = await supabase
-      .from('countries')
-      .select('*')
-      .eq('id', countryId)
-      .eq('business_id', businessId)
-      .single();
-
-    const { data, error } = await supabase
-      .from('countries')
-      .update({ active })
-      .eq('id', countryId)
-      .eq('business_id', businessId)
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    await AuditService.log({
-      business_id: businessId,
-      entity_type: 'countries',
-      entity_id: countryId,
-      action: 'toggle_active',
-      changes: { before, after: data },
-    });
-
-    return data;
-  }
-
-  static async exportCSV(businessId: string, filters: CountryFilters = {}): Promise<void> {
-    const countries = await this.list(businessId, filters);
-
-    const headers = [
-      { key: 'name_ar', label: 'الاسم' },
-      { key: 'currency', label: 'العملة' },
-      { key: 'active', label: 'نشط' },
-    ];
-
-    const data = countries.map((c) => ({
-      name_ar: c.name_ar,
-      currency: c.currency || '',
-      active: c.active ? 'نعم' : 'لا',
-    }));
-
-    exportToExcel(data, `countries-${Date.now()}.xlsx`, headers);
-  }
-
-  static async importCSV(
-    businessId: string,
-    file: File
-  ): Promise<{ success: number; errors: string[] }> {
-    const parsed = await parseImportFile(file);
-
-    const results = { success: 0, errors: [] as string[] };
-
-    for (let i = 0; i < parsed.dataRows.length; i++) {
-      try {
-        const cols = parsed.dataRows[i];
-
-        if (cols.length < 1) continue;
-
-        const name_ar = cols[0];
-        const currency = cols[1] || null;
-
-        if (!name_ar) {
-          results.errors.push(`السطر ${i + 2}: اسم الدولة مطلوب`);
-          continue;
-        }
-
-        await this.create(businessId, { name_ar, currency: currency || undefined });
-        results.success++;
-      } catch (error: any) {
-        results.errors.push(`السطر ${i + 2}: ${error.message}`);
-      }
-    }
-
-    await AuditService.log({
-      business_id: businessId,
-      entity_type: 'countries',
-      entity_id: 'bulk',
-      action: 'import',
-      changes: { success: results.success, errors_count: results.errors.length },
-    });
-
-    return results;
   }
 }
