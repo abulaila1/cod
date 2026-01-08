@@ -4,7 +4,10 @@ import { AuthProvider } from '@/contexts/AuthContext';
 import { BusinessProvider } from '@/contexts/BusinessContext';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { OnboardingRoute } from '@/components/auth/OnboardingRoute';
+import { GlobalErrorBoundary } from '@/components/common/GlobalError';
+import { RootRedirector } from '@/components/common/RootRedirector';
 
+import { AppLayout } from '@/components/layout/AppLayout';
 import { Home } from '@/pages/public/Home';
 import { Login } from '@/pages/auth/Login';
 import { Register } from '@/pages/auth/Register';
@@ -43,160 +46,66 @@ function App() {
   }
 
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <BusinessProvider>
-          <ToastProvider>
-            <Routes>
-              <Route path="/" element={<Home />} />
+    <GlobalErrorBoundary>
+      <BrowserRouter>
+        <AuthProvider>
+          <BusinessProvider>
+            <ToastProvider>
+              <Routes>
+                <Route path="/home" element={<Home />} />
 
-              <Route path="/auth/login" element={<Login />} />
-              <Route path="/auth/register" element={<Register />} />
-              <Route path="/auth/forgot-password" element={<ForgotPassword />} />
-              <Route path="/auth/reset-password" element={<ResetPassword />} />
-              <Route path="/auth/check-email" element={<CheckEmail />} />
-              <Route path="/auth/callback" element={<AuthCallback />} />
+                <Route path="/auth/login" element={<Login />} />
+                <Route path="/auth/register" element={<Register />} />
+                <Route path="/auth/forgot-password" element={<ForgotPassword />} />
+                <Route path="/auth/reset-password" element={<ResetPassword />} />
+                <Route path="/auth/check-email" element={<CheckEmail />} />
+                <Route path="/auth/callback" element={<AuthCallback />} />
 
-              <Route
-                path="/onboarding"
-                element={
-                  <OnboardingRoute>
-                    <Onboarding />
-                  </OnboardingRoute>
-                }
-              />
+                <Route path="/invite/:token" element={<InviteAcceptance />} />
 
-              <Route path="/invite/:token" element={<InviteAcceptance />} />
+                <Route
+                  path="/onboarding"
+                  element={
+                    <OnboardingRoute>
+                      <Onboarding />
+                    </OnboardingRoute>
+                  }
+                />
 
-            <Route
-              path="/app/dashboard"
-              element={
-                <ProtectedRoute>
-                  <Dashboard />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/app/orders"
-              element={
-                <ProtectedRoute>
-                  <Orders />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/app/products"
-              element={
-                <ProtectedRoute>
-                  <Products />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/app/carriers"
-              element={
-                <ProtectedRoute>
-                  <Carriers />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/app/countries"
-              element={
-                <ProtectedRoute>
-                  <Countries />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/app/employees"
-              element={
-                <ProtectedRoute>
-                  <Employees />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/app/reports"
-              element={
-                <ProtectedRoute>
-                  <Reports />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/app/settings"
-              element={
-                <ProtectedRoute>
-                  <Settings />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/app/workspace"
-              element={
-                <ProtectedRoute>
-                  <Workspace />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/app/statuses"
-              element={
-                <ProtectedRoute>
-                  <Statuses />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/app/billing"
-              element={
-                <ProtectedRoute>
-                  <Billing />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/app/settings/products"
-              element={
-                <ProtectedRoute>
-                  <ProductsManagement />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/app/settings/countries"
-              element={
-                <ProtectedRoute>
-                  <CountriesManagement />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/app/settings/carriers"
-              element={
-                <ProtectedRoute>
-                  <CarriersManagement />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/app/settings/employees"
-              element={
-                <ProtectedRoute>
-                  <EmployeesManagement />
-                </ProtectedRoute>
-              }
-            />
+                <Route
+                  path="/app"
+                  element={
+                    <ProtectedRoute>
+                      <AppLayout />
+                    </ProtectedRoute>
+                  }
+                >
+                  <Route index element={<Navigate to="/app/dashboard" replace />} />
+                  <Route path="dashboard" element={<Dashboard />} />
+                  <Route path="orders" element={<Orders />} />
+                  <Route path="products" element={<Products />} />
+                  <Route path="carriers" element={<Carriers />} />
+                  <Route path="countries" element={<Countries />} />
+                  <Route path="employees" element={<Employees />} />
+                  <Route path="reports" element={<Reports />} />
+                  <Route path="settings" element={<Settings />} />
+                  <Route path="workspace" element={<Workspace />} />
+                  <Route path="statuses" element={<Statuses />} />
+                  <Route path="billing" element={<Billing />} />
+                  <Route path="settings/products" element={<ProductsManagement />} />
+                  <Route path="settings/countries" element={<CountriesManagement />} />
+                  <Route path="settings/carriers" element={<CarriersManagement />} />
+                  <Route path="settings/employees" element={<EmployeesManagement />} />
+                </Route>
 
-            <Route path="/app" element={<Navigate to="/app/dashboard" replace />} />
-
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-          </ToastProvider>
-        </BusinessProvider>
-      </AuthProvider>
-    </BrowserRouter>
+                <Route path="/" element={<RootRedirector />} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </ToastProvider>
+          </BusinessProvider>
+        </AuthProvider>
+      </BrowserRouter>
+    </GlobalErrorBoundary>
   );
 }
 

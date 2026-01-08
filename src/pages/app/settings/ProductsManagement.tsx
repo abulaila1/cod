@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { AppLayout } from '@/components/layout';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { ProductsService } from '@/services/products.service';
 import { EntityPageLayout } from '@/components/entity/EntityPageLayout';
@@ -131,16 +130,16 @@ export function ProductsManagement() {
 
   if (!currentBusiness) {
     return (
-      <AppLayout pageTitle="إدارة المنتجات">
+      <>
         <div className="text-center py-12">
           <p className="text-zinc-600">لم يتم تحديد وورك سبيس</p>
         </div>
-      </AppLayout>
+      </>
     );
   }
 
   return (
-    <AppLayout pageTitle="إدارة المنتجات">
+    <>
       <EntityPageLayout
         title="المنتجات"
         description="إدارة المنتجات والتكاليف الأساسية"
@@ -205,6 +204,6 @@ export function ProductsManagement() {
         onClose={() => setIsImportOpen(false)}
         onImport={handleImport}
       />
-    </AppLayout>
+    </>
   );
 }

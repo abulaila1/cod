@@ -1,5 +1,4 @@
 import { useNavigate } from 'react-router-dom';
-import { AppLayout } from '@/components/layout';
 import { PageHeader } from '@/components/common/PageHeader';
 import { Card, CardContent, Button } from '@/components/ui';
 import {
@@ -46,7 +45,7 @@ function SettingCard({ icon: Icon, title, description, path, iconColor, iconBg }
 
 export function Settings() {
   return (
-    <AppLayout pageTitle="الإعدادات">
+    <>
       <PageHeader title="الإعدادات" description="إدارة إعدادات المنصة والبيانات الأساسية" />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -113,6 +112,6 @@ export function Settings() {
           iconBg="bg-zinc-50"
         />
       </div>
-    </AppLayout>
+    </>
   );
 }

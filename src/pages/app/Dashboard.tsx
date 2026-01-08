@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { AppLayout } from '@/components/layout';
 import { Card, CardContent, CardHeader, Button, Select, DateRangePicker } from '@/components/ui';
 import { SkeletonCard } from '@/components/common/Skeleton';
 import { useBusiness } from '@/contexts/BusinessContext';
@@ -99,16 +98,14 @@ export function Dashboard() {
 
   if (!currentBusiness) {
     return (
-      <AppLayout pageTitle="لوحة التحكم">
-        <div className="text-center py-12">
-          <p className="text-zinc-600">لم يتم تحديد وورك سبيس</p>
-        </div>
-      </AppLayout>
+      <div className="text-center py-12">
+        <p className="text-zinc-600">لم يتم تحديد وورك سبيس</p>
+      </div>
     );
   }
 
   return (
-    <AppLayout pageTitle="لوحة التحكم">
+    <>
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-zinc-950 mb-2">لوحة التحكم</h1>
         <p className="text-zinc-600">نظرة شاملة على أداء عملك</p>
@@ -376,6 +373,6 @@ export function Dashboard() {
           </Card>
         </>
       )}
-    </AppLayout>
+    </>
   );
 }

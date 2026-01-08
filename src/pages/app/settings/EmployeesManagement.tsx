@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { AppLayout } from '@/components/layout';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { EmployeesService } from '@/services/employees.service';
 import { EntityPageLayout } from '@/components/entity/EntityPageLayout';
@@ -124,16 +123,16 @@ export function EmployeesManagement() {
 
   if (!currentBusiness) {
     return (
-      <AppLayout pageTitle="إدارة الموظفين">
+      <>
         <div className="text-center py-12">
           <p className="text-zinc-600">لم يتم تحديد وورك سبيس</p>
         </div>
-      </AppLayout>
+      </>
     );
   }
 
   return (
-    <AppLayout pageTitle="إدارة الموظفين">
+    <>
       <EntityPageLayout
         title="الموظفين"
         description="إدارة الموظفين والمسؤولين عن الطلبات"
@@ -185,6 +184,6 @@ export function EmployeesManagement() {
         onClose={() => setIsImportOpen(false)}
         onImport={handleImport}
       />
-    </AppLayout>
+    </>
   );
 }

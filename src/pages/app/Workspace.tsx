@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { AppLayout } from '@/components/layout';
 import { Card, CardContent, CardHeader, Button, Input, Modal } from '@/components/ui';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -104,16 +103,16 @@ export function Workspace() {
 
   if (!currentBusiness) {
     return (
-      <AppLayout pageTitle="إدارة الوورك سبيس">
+      <>
         <div className="text-center py-12">
           <p className="text-zinc-600">لم يتم تحديد وورك سبيس</p>
         </div>
-      </AppLayout>
+      </>
     );
   }
 
   return (
-    <AppLayout pageTitle="إدارة الوورك سبيس">
+    <>
       <div className="space-y-8">
         <Card>
           <CardHeader>
@@ -291,6 +290,6 @@ export function Workspace() {
           </div>
         </Modal>
       )}
-    </AppLayout>
+    </>
   );
 }

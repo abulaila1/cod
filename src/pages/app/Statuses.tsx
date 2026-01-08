@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { AppLayout } from '@/components/layout';
 import { Card, CardContent, CardHeader, Button, Input, Modal, Badge } from '@/components/ui';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -194,16 +193,16 @@ export function Statuses() {
 
   if (!currentBusiness) {
     return (
-      <AppLayout pageTitle="حالات الطلب">
+      <>
         <div className="text-center py-12">
           <p className="text-zinc-600">لم يتم تحديد وورك سبيس</p>
         </div>
-      </AppLayout>
+      </>
     );
   }
 
   return (
-    <AppLayout pageTitle="حالات الطلب">
+    <>
       <Card>
         <CardHeader className="flex items-center justify-between">
           <div>
@@ -449,6 +448,6 @@ export function Statuses() {
           </div>
         </Modal>
       )}
-    </AppLayout>
+    </>
   );
 }

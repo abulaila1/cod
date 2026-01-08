@@ -1,21 +1,42 @@
 import { Menu, User, LogOut } from 'lucide-react';
 import { useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { BusinessSwitcher } from '@/components/business/BusinessSwitcher';
 
 interface TopbarProps {
-  pageTitle: string;
   onMenuClick: () => void;
 }
 
-export function Topbar({ pageTitle, onMenuClick }: TopbarProps) {
-  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
-  const { user, logout } = useAuth();
+const PAGE_TITLES: Record<string, string> = {
+  '/app/dashboard': 'لوحة التحكم',
+  '/app/orders': 'الطلبات',
+  '/app/products': 'المنتجات',
+  '/app/carriers': 'شركات الشحن',
+  '/app/countries': 'الدول',
+  '/app/employees': 'الموظفين',
+  '/app/reports': 'التقارير',
+  '/app/settings': 'الإعدادات',
+  '/app/workspace': 'الوورك سبيس',
+  '/app/statuses': 'الحالات',
+  '/app/billing': 'الفوترة',
+  '/app/settings/products': 'إدارة المنتجات',
+  '/app/settings/countries': 'إدارة الدول',
+  '/app/settings/carriers': 'إدارة شركات الشحن',
+  '/app/settings/employees': 'إدارة الموظفين',
+};
 
-  const handleLogout = () => {
-    logout();
+export function Topbar({ onMenuClick }: TopbarProps) {
+  const location = useLocation();
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const { user, signOut } = useAuth();
+
+  const handleLogout = async () => {
+    await signOut();
     setIsUserMenuOpen(false);
   };
+
+  const pageTitle = PAGE_TITLES[location.pathname] || 'التطبيق';
 
   return (
     <header className="bg-white/80 backdrop-blur-sm shadow-soft sticky top-0 z-30">

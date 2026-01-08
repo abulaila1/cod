@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { AppLayout } from '@/components/layout';
 import { PageHeader } from '@/components/common/PageHeader';
 import { Card, CardContent, Button, Badge, Modal } from '@/components/ui';
 import { useBusiness } from '@/contexts/BusinessContext';
@@ -104,22 +103,22 @@ export function Billing() {
 
   if (!currentBusiness) {
     return (
-      <AppLayout pageTitle="الفوترة والخطة">
+      <>
         <div className="text-center py-12">
           <p className="text-zinc-600">لم يتم تحديد وورك سبيس</p>
         </div>
-      </AppLayout>
+      </>
     );
   }
 
   if (isLoading || !billing || !usage) {
     return (
-      <AppLayout pageTitle="الفوترة والخطة">
+      <>
         <div className="text-center py-12">
           <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent"></div>
           <p className="mt-4 text-zinc-600">جاري التحميل...</p>
         </div>
-      </AppLayout>
+      </>
     );
   }
 
@@ -128,7 +127,7 @@ export function Billing() {
   const isTrialExpired = BillingService.isTrialExpired(billing);
 
   return (
-    <AppLayout pageTitle="الفوترة والخطة">
+    <>
       <PageHeader
         title="الفوترة والخطة"
         description="إدارة خطة الاشتراك واستخدام الطلبات الشهري"
@@ -512,6 +511,6 @@ export function Billing() {
           </div>
         </div>
       </Modal>
-    </AppLayout>
+    </>
   );
 }

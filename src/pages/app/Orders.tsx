@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { AppLayout } from '@/components/layout';
 import { PageHeader } from '@/components/common/PageHeader';
 import { Button, Card, CardContent, Modal } from '@/components/ui';
 import { useBusiness } from '@/contexts/BusinessContext';
@@ -181,16 +180,16 @@ export function Orders() {
 
   if (!currentBusiness) {
     return (
-      <AppLayout pageTitle="الطلبات">
+      <>
         <div className="text-center py-12">
           <p className="text-zinc-600">لم يتم تحديد وورك سبيس</p>
         </div>
-      </AppLayout>
+      </>
     );
   }
 
   return (
-    <AppLayout pageTitle="الطلبات">
+    <>
       <PageHeader
         title="الطلبات"
         description="إدارة ومتابعة جميع الطلبات"
@@ -327,6 +326,6 @@ export function Orders() {
           </div>
         )}
       </Modal>
-    </AppLayout>
+    </>
   );
 }

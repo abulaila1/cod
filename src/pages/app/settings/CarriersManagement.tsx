@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { AppLayout } from '@/components/layout';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { CarriersService } from '@/services/carriers.service';
 import { EntityPageLayout } from '@/components/entity/EntityPageLayout';
@@ -119,16 +118,16 @@ export function CarriersManagement() {
 
   if (!currentBusiness) {
     return (
-      <AppLayout pageTitle="إدارة شركات الشحن">
+      <>
         <div className="text-center py-12">
           <p className="text-zinc-600">لم يتم تحديد وورك سبيس</p>
         </div>
-      </AppLayout>
+      </>
     );
   }
 
   return (
-    <AppLayout pageTitle="إدارة شركات الشحن">
+    <>
       <EntityPageLayout
         title="شركات الشحن"
         description="إدارة شركات الشحن والتوصيل"
@@ -171,6 +170,6 @@ export function CarriersManagement() {
         onClose={() => setIsImportOpen(false)}
         onImport={handleImport}
       />
-    </AppLayout>
+    </>
   );
 }

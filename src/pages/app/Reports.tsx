@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { AppLayout } from '@/components/layout';
 import { PageHeader } from '@/components/common/PageHeader';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { ReportsService } from '@/services/reports.service';
@@ -202,17 +201,17 @@ export function Reports() {
 
   if (!currentBusiness) {
     return (
-      <AppLayout pageTitle="التقارير">
+      <>
         <PageHeader title="التقارير" description="تقارير يومية وأسبوعية وشهرية" />
         <div className="text-center py-12">
           <p className="text-zinc-600">لم يتم تحديد وورك سبيس</p>
         </div>
-      </AppLayout>
+      </>
     );
   }
 
   return (
-    <AppLayout pageTitle="التقارير">
+    <>
       <div className="flex items-center justify-between mb-6">
         <PageHeader title="التقارير" description="تقارير يومية وأسبوعية وشهرية" />
         <SavedReportsDropdown
@@ -267,6 +266,6 @@ export function Reports() {
         onClose={() => setIsSaveModalOpen(false)}
         onSave={handleSaveReport}
       />
-    </AppLayout>
+    </>
   );
 }
