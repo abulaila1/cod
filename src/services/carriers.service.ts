@@ -1,60 +1,121 @@
 import { supabase } from './supabase';
 import { AuditService } from './audit.service';
-import { exportToCSV } from '@/utils/csv';
-import { exportToExcel } from '@/utils/excel';
-import { parseImportFile } from '@/utils/file-parser';
-import type { Carrier } from '@/types/domain';
+
+export interface Carrier {
+  id: string;
+  business_id: string;
+  name_ar: string;
+  name_en?: string;
+  tracking_url?: string;
+  is_active: boolean;
+  created_at?: string;
+}
+
+export interface CarrierCityPrice {
+  id: string;
+  business_id: string;
+  carrier_id: string;
+  city_id: string;
+  shipping_cost: number;
+  city?: {
+    id: string;
+    name_ar: string;
+    name_en?: string;
+    shipping_cost: number;
+  };
+}
+
+export interface CarrierSettings {
+  id: string;
+  business_id: string;
+  carrier_id: string;
+  good_threshold: number;
+  warning_threshold: number;
+  good_color: string;
+  warning_color: string;
+  bad_color: string;
+}
+
+export interface CarrierAnalytics {
+  total_orders: number;
+  delivered_orders: number;
+  returned_orders: number;
+  in_transit_orders: number;
+  delivery_rate: number;
+  return_rate: number;
+  total_revenue: number;
+  total_shipping_cost: number;
+  city_performance: CityPerformance[];
+}
+
+export interface CityPerformance {
+  city_id: string;
+  city_name: string;
+  total_orders: number;
+  delivered_orders: number;
+  returned_orders: number;
+  delivery_rate: number;
+}
 
 export interface CarrierFilters {
   search?: string;
   activeOnly?: boolean;
-  sort?: 'name_ar' | 'created_at';
-  sortDirection?: 'asc' | 'desc';
-}
-
-export interface CreateCarrierInput {
-  name_ar: string;
-}
-
-export interface UpdateCarrierInput {
-  name_ar?: string;
 }
 
 export class CarriersService {
   static async list(businessId: string, filters: CarrierFilters = {}): Promise<Carrier[]> {
-    let query = supabase.from('carriers').select('*').eq('business_id', businessId);
+    let query = supabase
+      .from('carriers')
+      .select('*')
+      .eq('business_id', businessId);
 
-    if (filters.activeOnly !== undefined) {
-      query = query.eq('active', filters.activeOnly);
+    if (filters.activeOnly) {
+      query = query.eq('is_active', true);
     }
 
     if (filters.search) {
-      query = query.ilike('name_ar', `%${filters.search}%`);
+      query = query.or(`name_ar.ilike.%${filters.search}%,name_en.ilike.%${filters.search}%`);
     }
 
-    const sortField = filters.sort || 'created_at';
-    const sortDir = filters.sortDirection || 'desc';
-    query = query.order(sortField, { ascending: sortDir === 'asc' });
+    query = query.order('name_ar', { ascending: true });
 
     const { data, error } = await query;
 
     if (error) throw error;
-
     return data || [];
   }
 
-  static async create(businessId: string, input: CreateCarrierInput): Promise<Carrier> {
+  static async getById(businessId: string, carrierId: string): Promise<Carrier | null> {
+    const { data, error } = await supabase
+      .from('carriers')
+      .select('*')
+      .eq('id', carrierId)
+      .eq('business_id', businessId)
+      .maybeSingle();
+
+    if (error) throw error;
+    return data;
+  }
+
+  static async create(
+    businessId: string,
+    input: { name_ar: string; name_en?: string; tracking_url?: string }
+  ): Promise<Carrier> {
     const { data, error } = await supabase
       .from('carriers')
       .insert({
         business_id: businessId,
         name_ar: input.name_ar,
-        active: true,
+        name_en: input.name_en || input.name_ar,
+        tracking_url: input.tracking_url || null,
+        is_active: true,
       })
       .select()
       .single();
 
     if (error) throw error;
+
+    await this.createDefaultSettings(businessId, data.id);
 
     await AuditService.log({
       business_id: businessId,
@@ -70,7 +131,7 @@ export class CarriersService {
   static async update(
     businessId: string,
     carrierId: string,
-    input: UpdateCarrierInput
+    input: { name_ar?: string; name_en?: string; tracking_url?: string; is_active?: boolean }
   ): Promise<Carrier> {
     const { data: before } = await supabase
       .from('carriers')
@@ -100,11 +161,7 @@ export class CarriersService {
     return data;
   }
 
-  static async toggleActive(
-    businessId: string,
-    carrierId: string,
-    active: boolean
-  ): Promise<Carrier> {
+  static async delete(businessId: string, carrierId: string): Promise<void> {
     const { data: before } = await supabase
       .from('carriers')
       .select('*')
@@ -112,13 +169,11 @@ export class CarriersService {
       .eq('business_id', businessId)
       .single();
 
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('carriers')
-      .update({ active })
+      .delete()
       .eq('id', carrierId)
-      .eq('business_id', businessId)
-      .select()
-      .single();
+      .eq('business_id', businessId);
 
     if (error) throw error;
 
@@ -126,65 +181,241 @@ export class CarriersService {
       business_id: businessId,
       entity_type: 'carriers',
       entity_id: carrierId,
-      action: 'toggle_active',
-      changes: { before, after: data },
+      action: 'delete',
+      changes: { deleted: before },
     });
+  }
 
+  static async toggleActive(businessId: string, carrierId: string, isActive: boolean): Promise<Carrier> {
+    return this.update(businessId, carrierId, { is_active: isActive });
+  }
+
+  static async getCityPrices(businessId: string, carrierId: string): Promise<CarrierCityPrice[]> {
+    const { data, error } = await supabase
+      .from('carrier_city_prices')
+      .select(`
+        *,
+        city:cities(id, name_ar, name_en, shipping_cost)
+      `)
+      .eq('business_id', businessId)
+      .eq('carrier_id', carrierId);
+
+    if (error) throw error;
+    return data || [];
+  }
+
+  static async setCityPrice(
+    businessId: string,
+    carrierId: string,
+    cityId: string,
+    shippingCost: number
+  ): Promise<CarrierCityPrice> {
+    const { data: existing } = await supabase
+      .from('carrier_city_prices')
+      .select('*')
+      .eq('carrier_id', carrierId)
+      .eq('city_id', cityId)
+      .maybeSingle();
+
+    if (existing) {
+      const { data, error } = await supabase
+        .from('carrier_city_prices')
+        .update({ shipping_cost: shippingCost })
+        .eq('id', existing.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    } else {
+      const { data, error } = await supabase
+        .from('carrier_city_prices')
+        .insert({
+          business_id: businessId,
+          carrier_id: carrierId,
+          city_id: cityId,
+          shipping_cost: shippingCost,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    }
+  }
+
+  static async removeCityPrice(businessId: string, carrierId: string, cityId: string): Promise<void> {
+    const { error } = await supabase
+      .from('carrier_city_prices')
+      .delete()
+      .eq('business_id', businessId)
+      .eq('carrier_id', carrierId)
+      .eq('city_id', cityId);
+
+    if (error) throw error;
+  }
+
+  static async getSettings(businessId: string, carrierId: string): Promise<CarrierSettings | null> {
+    const { data, error } = await supabase
+      .from('carrier_settings')
+      .select('*')
+      .eq('business_id', businessId)
+      .eq('carrier_id', carrierId)
+      .maybeSingle();
+
+    if (error) throw error;
     return data;
   }
 
-  static async exportCSV(businessId: string, filters: CarrierFilters = {}): Promise<void> {
-    const carriers = await this.list(businessId, filters);
+  static async createDefaultSettings(businessId: string, carrierId: string): Promise<CarrierSettings> {
+    const { data, error } = await supabase
+      .from('carrier_settings')
+      .insert({
+        business_id: businessId,
+        carrier_id: carrierId,
+        good_threshold: 70,
+        warning_threshold: 50,
+        good_color: '#10B981',
+        warning_color: '#F59E0B',
+        bad_color: '#EF4444',
+      })
+      .select()
+      .single();
 
-    const headers = [
-      { key: 'name_ar', label: 'الاسم' },
-      { key: 'active', label: 'نشط' },
-    ];
-
-    const data = carriers.map((c) => ({
-      name_ar: c.name_ar,
-      active: c.active ? 'نعم' : 'لا',
-    }));
-
-    exportToExcel(data, `carriers-${Date.now()}.xlsx`, headers);
+    if (error) throw error;
+    return data;
   }
 
-  static async importCSV(
+  static async updateSettings(
     businessId: string,
-    file: File
-  ): Promise<{ success: number; errors: string[] }> {
-    const parsed = await parseImportFile(file);
+    carrierId: string,
+    input: {
+      good_threshold?: number;
+      warning_threshold?: number;
+      good_color?: string;
+      warning_color?: string;
+      bad_color?: string;
+    }
+  ): Promise<CarrierSettings> {
+    const existing = await this.getSettings(businessId, carrierId);
 
-    const results = { success: 0, errors: [] as string[] };
+    if (existing) {
+      const { data, error } = await supabase
+        .from('carrier_settings')
+        .update(input)
+        .eq('id', existing.id)
+        .select()
+        .single();
 
-    for (let i = 0; i < parsed.dataRows.length; i++) {
-      try {
-        const cols = parsed.dataRows[i];
+      if (error) throw error;
+      return data;
+    } else {
+      const { data, error } = await supabase
+        .from('carrier_settings')
+        .insert({
+          business_id: businessId,
+          carrier_id: carrierId,
+          ...input,
+        })
+        .select()
+        .single();
 
-        if (cols.length < 1) continue;
+      if (error) throw error;
+      return data;
+    }
+  }
 
-        const name_ar = cols[0];
+  static async getAnalytics(
+    businessId: string,
+    carrierId: string,
+    dateFrom?: string,
+    dateTo?: string
+  ): Promise<CarrierAnalytics> {
+    let query = supabase
+      .from('orders')
+      .select(`
+        id,
+        status_id,
+        revenue,
+        shipping_cost,
+        city_id,
+        status:statuses(counts_as_delivered, counts_as_return, counts_as_active),
+        city:cities(id, name_ar)
+      `)
+      .eq('business_id', businessId)
+      .eq('carrier_id', carrierId);
 
-        if (!name_ar) {
-          results.errors.push(`السطر ${i + 2}: اسم شركة الشحن مطلوب`);
-          continue;
-        }
-
-        await this.create(businessId, { name_ar });
-        results.success++;
-      } catch (error: any) {
-        results.errors.push(`السطر ${i + 2}: ${error.message}`);
-      }
+    if (dateFrom) {
+      query = query.gte('order_date', dateFrom);
+    }
+    if (dateTo) {
+      query = query.lte('order_date', dateTo);
     }
 
-    await AuditService.log({
-      business_id: businessId,
-      entity_type: 'carriers',
-      entity_id: 'bulk',
-      action: 'import',
-      changes: { success: results.success, errors_count: results.errors.length },
+    const { data: orders, error } = await query;
+
+    if (error) throw error;
+
+    const safeOrders = orders || [];
+
+    const total_orders = safeOrders.length;
+    const delivered_orders = safeOrders.filter(o => o.status?.counts_as_delivered).length;
+    const returned_orders = safeOrders.filter(o => o.status?.counts_as_return).length;
+    const in_transit_orders = safeOrders.filter(o => o.status?.counts_as_active).length;
+
+    const delivery_rate = total_orders > 0 ? (delivered_orders / total_orders) * 100 : 0;
+    const return_rate = total_orders > 0 ? (returned_orders / total_orders) * 100 : 0;
+
+    const total_revenue = safeOrders.reduce((sum, o) => sum + (Number(o.revenue) || 0), 0);
+    const total_shipping_cost = safeOrders.reduce((sum, o) => sum + (Number(o.shipping_cost) || 0), 0);
+
+    const cityMap = new Map<string, CityPerformance>();
+
+    safeOrders.forEach(order => {
+      if (!order.city_id || !order.city) return;
+
+      const cityId = order.city_id;
+      const cityName = order.city.name_ar;
+
+      if (!cityMap.has(cityId)) {
+        cityMap.set(cityId, {
+          city_id: cityId,
+          city_name: cityName,
+          total_orders: 0,
+          delivered_orders: 0,
+          returned_orders: 0,
+          delivery_rate: 0,
+        });
+      }
+
+      const cityPerf = cityMap.get(cityId)!;
+      cityPerf.total_orders++;
+
+      if (order.status?.counts_as_delivered) {
+        cityPerf.delivered_orders++;
+      }
+      if (order.status?.counts_as_return) {
+        cityPerf.returned_orders++;
+      }
     });
 
-    return results;
+    const city_performance = Array.from(cityMap.values()).map(city => ({
+      ...city,
+      delivery_rate: city.total_orders > 0 ? (city.delivered_orders / city.total_orders) * 100 : 0,
+    }));
+
+    city_performance.sort((a, b) => b.delivery_rate - a.delivery_rate);
+
+    return {
+      total_orders,
+      delivered_orders,
+      returned_orders,
+      in_transit_orders,
+      delivery_rate,
+      return_rate,
+      total_revenue,
+      total_shipping_cost,
+      city_performance,
+    };
   }
 }
