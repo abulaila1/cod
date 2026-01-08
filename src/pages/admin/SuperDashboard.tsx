@@ -15,7 +15,9 @@ import {
   ShieldOff,
   Shield,
   Trash2,
-  RefreshCw
+  RefreshCw,
+  MessageCircle,
+  Settings,
 } from 'lucide-react';
 import { useSuperAdmin } from '../../contexts/SuperAdminContext';
 import {
@@ -24,11 +26,13 @@ import {
   AdminStats,
   WorkspaceStatus
 } from '../../services/business.service';
+import { PlatformService, PlatformSettings } from '../../services/platform.service';
 import { Card, CardContent, CardHeader } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Input } from '../../components/ui/Input';
 import { Skeleton } from '../../components/common/Skeleton';
+import { Textarea } from '../../components/ui/Textarea';
 
 function StatsCard({
   title,
@@ -267,6 +271,9 @@ export default function SuperDashboard() {
   const [editingLimit, setEditingLimit] = useState<EditingLimit | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [deleteWorkspace, setDeleteWorkspace] = useState<AdminWorkspace | null>(null);
+  const [platformSettings, setPlatformSettings] = useState<PlatformSettings | null>(null);
+  const [editingSettings, setEditingSettings] = useState<PlatformSettings | null>(null);
+  const [savingSettings, setSavingSettings] = useState(false);
 
   useEffect(() => {
     if (isSuperAdmin) {
@@ -277,16 +284,36 @@ export default function SuperDashboard() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [statsData, workspacesData] = await Promise.all([
+      const [statsData, workspacesData, settingsData] = await Promise.all([
         BusinessService.getAdminStats(),
         BusinessService.getAllWorkspacesForAdmin(),
+        PlatformService.getSettings(),
       ]);
       setStats(statsData);
       setWorkspaces(workspacesData);
+      setPlatformSettings(settingsData);
     } catch (error) {
       console.error('Failed to load admin data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSaveSettings = async () => {
+    if (!editingSettings) return;
+    setSavingSettings(true);
+    try {
+      await Promise.all([
+        PlatformService.updateSetting('whatsapp_number', editingSettings.whatsapp_number),
+        PlatformService.updateSetting('whatsapp_cta_text', editingSettings.whatsapp_cta_text),
+        PlatformService.updateSetting('whatsapp_message', editingSettings.whatsapp_message),
+      ]);
+      setPlatformSettings(editingSettings);
+      setEditingSettings(null);
+    } catch (error) {
+      console.error('Failed to save settings:', error);
+    } finally {
+      setSavingSettings(false);
     }
   };
 
@@ -611,6 +638,128 @@ export default function SuperDashboard() {
         <div className="mt-4 text-center text-xs text-zinc-500">
           Showing {filteredWorkspaces.length} of {workspaces.length} workspaces
         </div>
+
+        <Card className="shadow-lg mt-8">
+          <CardHeader className="border-b border-zinc-200">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
+                  <MessageCircle className="w-5 h-5 text-emerald-600" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-zinc-900">WhatsApp Settings</h2>
+                  <p className="text-sm text-zinc-500">Configure WhatsApp button for billing page</p>
+                </div>
+              </div>
+              {!editingSettings && platformSettings && (
+                <Button
+                  variant="outline"
+                  onClick={() => setEditingSettings({ ...platformSettings })}
+                >
+                  <Edit3 className="w-4 h-4 mr-2" />
+                  Edit
+                </Button>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <Skeleton className="h-32" />
+            ) : editingSettings ? (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-zinc-700 mb-1">
+                    WhatsApp Number
+                  </label>
+                  <Input
+                    value={editingSettings.whatsapp_number}
+                    onChange={(e) => setEditingSettings({
+                      ...editingSettings,
+                      whatsapp_number: e.target.value
+                    })}
+                    placeholder="966500000000"
+                    dir="ltr"
+                  />
+                  <p className="text-xs text-zinc-500 mt-1">Without + or 00 prefix</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-zinc-700 mb-1">
+                    Button Text (CTA)
+                  </label>
+                  <Input
+                    value={editingSettings.whatsapp_cta_text}
+                    onChange={(e) => setEditingSettings({
+                      ...editingSettings,
+                      whatsapp_cta_text: e.target.value
+                    })}
+                    placeholder="تواصل معنا عبر واتساب"
+                    dir="rtl"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-zinc-700 mb-1">
+                    Default Message Template
+                  </label>
+                  <Textarea
+                    value={editingSettings.whatsapp_message}
+                    onChange={(e) => setEditingSettings({
+                      ...editingSettings,
+                      whatsapp_message: e.target.value
+                    })}
+                    placeholder="مرحباً، أريد الاشتراك..."
+                    rows={3}
+                    dir="rtl"
+                  />
+                  <p className="text-xs text-zinc-500 mt-1">
+                    Use {'{plan}'} for plan name and {'${price}'} for price
+                  </p>
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <Button
+                    variant="primary"
+                    onClick={handleSaveSettings}
+                    disabled={savingSettings}
+                    className="bg-emerald-600 hover:bg-emerald-700"
+                  >
+                    {savingSettings ? (
+                      'Saving...'
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4 mr-2" />
+                        Save Changes
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setEditingSettings(null)}
+                    disabled={savingSettings}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            ) : platformSettings ? (
+              <div className="grid md:grid-cols-3 gap-6">
+                <div className="bg-zinc-50 rounded-xl p-4">
+                  <p className="text-xs text-zinc-500 mb-1">WhatsApp Number</p>
+                  <p className="font-mono text-zinc-900" dir="ltr">+{platformSettings.whatsapp_number}</p>
+                </div>
+                <div className="bg-zinc-50 rounded-xl p-4">
+                  <p className="text-xs text-zinc-500 mb-1">Button Text</p>
+                  <p className="text-zinc-900" dir="rtl">{platformSettings.whatsapp_cta_text}</p>
+                </div>
+                <div className="bg-zinc-50 rounded-xl p-4">
+                  <p className="text-xs text-zinc-500 mb-1">Message Template</p>
+                  <p className="text-zinc-900 text-sm" dir="rtl">{platformSettings.whatsapp_message}</p>
+                </div>
+              </div>
+            ) : null}
+          </CardContent>
+        </Card>
       </div>
 
       {deleteWorkspace && (

@@ -5,6 +5,7 @@ import { useBusiness } from '@/contexts/BusinessContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { BillingService } from '@/services/billing.service';
 import { UsageService } from '@/services/usage.service';
+import { PlatformService, PlatformSettings } from '@/services/platform.service';
 import {
   Check,
   CreditCard,
@@ -63,7 +64,11 @@ export function Billing() {
   const [receiptRef, setReceiptRef] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [platformSettings, setPlatformSettings] = useState<PlatformSettings | null>(null);
 
+  useEffect(() => {
+    PlatformService.getSettings().then(setPlatformSettings);
+  }, []);
 
   const loadBillingData = useCallback(async () => {
     if (!currentBusiness || !user) return;
@@ -125,16 +130,16 @@ export function Billing() {
   };
 
   const handleWhatsAppClick = () => {
-    if (!selectedPlan || !currentBusiness) return;
+    if (!selectedPlan || !currentBusiness || !platformSettings) return;
     const finalPrice = hasDiscount
       ? BillingService.getDiscountedPrice(selectedPlan.price)
       : selectedPlan.price;
-    const link = BillingService.generateWhatsAppLink(
-      selectedPlan.nameAr,
-      finalPrice,
-      currentBusiness.name,
-      receiptRef || undefined
-    );
+    const message = PlatformService.formatMessage(platformSettings.whatsapp_message, {
+      plan: selectedPlan.nameAr,
+      price: finalPrice.toString(),
+      business: currentBusiness.name,
+    });
+    const link = PlatformService.formatWhatsAppUrl(platformSettings.whatsapp_number, message);
     window.open(link, '_blank');
   };
 
@@ -489,9 +494,10 @@ export function Billing() {
                   variant="primary"
                   className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 py-4 text-lg"
                   onClick={handleWhatsAppClick}
+                  disabled={!platformSettings}
                 >
                   <MessageCircle className="h-6 w-6 ml-2" />
-                  تواصل معنا عبر واتساب
+                  {platformSettings?.whatsapp_cta_text || 'تواصل معنا عبر واتساب'}
                 </Button>
                 <p className="text-xs text-zinc-500 text-center mt-2">
                   سنرسل لك تفاصيل الدفع المناسبة لبلدك
