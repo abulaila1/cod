@@ -49,7 +49,7 @@ function formatTime(ms: number): string {
 }
 
 export function Billing() {
-  const { currentBusiness, currentMember } = useBusiness();
+  const { currentBusiness } = useBusiness();
   const { user } = useAuth();
   const [billing, setBilling] = useState<Billing | null>(null);
   const [usage, setUsage] = useState<UsageStatus | null>(null);
@@ -64,7 +64,6 @@ export function Billing() {
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
-  const canManage = currentMember?.role === 'admin' || currentMember?.role === 'manager';
 
   const loadBillingData = useCallback(async () => {
     if (!currentBusiness || !user) return;
@@ -232,16 +231,14 @@ export function Billing() {
                 <p className="text-white/90">اشترك الآن للاستمرار في استخدام النظام</p>
               </div>
             </div>
-            {canManage && (
-              <Button
-                variant="outline"
-                className="bg-white text-red-600 border-white hover:bg-red-50"
-                onClick={() => openPaymentModal(PLANS.find(p => p.popular) || PLANS[0])}
-              >
-                اشترك الآن
-                <ArrowRight className="h-4 w-4 mr-2" />
-              </Button>
-            )}
+            <Button
+              variant="outline"
+              className="bg-white text-red-600 border-white hover:bg-red-50"
+              onClick={() => openPaymentModal(PLANS.find(p => p.popular) || PLANS[0])}
+            >
+              اشترك الآن
+              <ArrowRight className="h-4 w-4 mr-2" />
+            </Button>
           </div>
         </div>
       )}
@@ -329,7 +326,7 @@ export function Billing() {
                   ))}
                 </div>
 
-                {canManage && !isCurrentPlan && (
+                {!isCurrentPlan && (
                   <Button
                     variant="primary"
                     className={`w-full ${
