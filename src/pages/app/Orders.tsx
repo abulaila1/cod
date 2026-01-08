@@ -14,8 +14,9 @@ import { OrderDetailsDrawer } from '@/components/orders/OrderDetailsDrawer';
 import { ImportModal } from '@/components/entity/ImportModal';
 import type { OrderFilters } from '@/types/domain';
 import { FileText, X } from 'lucide-react';
-import { generateOrderTemplate, validateOrderHeaders } from '@/utils/order-import';
+import { generateOrderTemplate } from '@/utils/order-import';
 import { parseImportFile } from '@/utils/file-parser';
+import type { ImportResult } from '@/services/orders.service';
 
 export function Orders() {
   const { currentBusiness } = useBusiness();
@@ -113,7 +114,7 @@ export function Orders() {
     URL.revokeObjectURL(url);
   };
 
-  const handleImportCsv = async (file: File): Promise<{ success: number; errors: string[] }> => {
+  const handleImportCsv = async (file: File): Promise<ImportResult> => {
     if (!currentBusiness || !user) {
       throw new Error('لم يتم تحديد وورك سبيس أو المستخدم');
     }
@@ -121,36 +122,21 @@ export function Orders() {
     try {
       const parsed = await parseImportFile(file);
 
-      const validation = validateOrderHeaders(parsed.headers);
-
-      if (!validation.valid) {
-        const optionalNote = validation.optional.length > 0
-          ? `\n\nأعمدة اختيارية موجودة: ${validation.optional.join(', ')}`
-          : '';
-
-        throw new Error(
-          `تنسيق الملف غير صحيح. يرجى استخدام القالب الرسمي.\n\n` +
-          `✓ الأعمدة المطلوبة الموجودة (${validation.found.length}):\n${validation.found.join(', ')}\n\n` +
-          `✗ الأعمدة المطلوبة المفقودة (${validation.missing.length}):\n${validation.missing.join(', ')}` +
-          optionalNote + `\n\n` +
-          `━━━━━━━━━━━━━━━━━━━━\n\n` +
-          `الأعمدة المطلوبة (إلزامية):\nCustomer Name, Phone Number, Governorate, City/Address, Product Name, Quantity, Price\n\n` +
-          `الأعمدة الاختيارية:\nNotes (يمكن تركها فارغة)`
-        );
-      }
-
       const csvContent = [
         parsed.headers.join(','),
         ...parsed.dataRows.map((row) => row.map((cell) => `"${cell}"`).join(',')),
       ].join('\n');
 
-      const result = await OrdersService.importOrdersCsv(
+      const result = await OrdersService.importOrdersStrict(
         currentBusiness.id,
         user.id,
         csvContent
       );
 
-      loadOrders();
+      if (result.success > 0) {
+        loadOrders();
+      }
+
       return result;
     } catch (error: any) {
       throw error;

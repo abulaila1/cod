@@ -1,9 +1,15 @@
 import { supabase } from './supabase';
 import { UsageService } from './usage.service';
 import { BillingService } from './billing.service';
+import {
+  validateImportData,
+  parseCSVLine,
+  type ImportRowData,
+  type ImportValidationResult,
+  type RowValidationError,
+} from '@/utils/order-import';
 import type {
   Order,
-  OrderItem,
   OrderWithRelations,
   OrderFilters,
   OrderPagination,
@@ -12,6 +18,14 @@ import type {
   OrderUpdatePatch,
   AuditLogWithUser,
 } from '@/types/domain';
+
+export interface ImportResult {
+  success: number;
+  failed: number;
+  errors: Array<{ rowNumber: number; errors: RowValidationError[] }>;
+  headerErrors: string[];
+  productsCreated: string[];
+}
 
 export class OrdersService {
   private static async ensureCanAddOrders(
@@ -359,129 +373,190 @@ export class OrdersService {
     return csvContent;
   }
 
+  static async importOrdersStrict(
+    businessId: string,
+    userId: string,
+    csvContent: string
+  ): Promise<ImportResult> {
+    const lines = csvContent.split('\n').filter((line) => line.trim());
+
+    if (lines.length < 2) {
+      return {
+        success: 0,
+        failed: 0,
+        errors: [],
+        headerErrors: ['الملف فارغ أو لا يحتوي على بيانات'],
+        productsCreated: [],
+      };
+    }
+
+    const headers = parseCSVLine(lines[0]).map(h => h.replace(/^"|"$/g, ''));
+    const dataRows = lines.slice(1).map(line => parseCSVLine(line).map(v => v.replace(/^"|"$/g, '')));
+
+    const validation = validateImportData(headers, dataRows);
+
+    if (!validation.headerValidation.isValid) {
+      return {
+        success: 0,
+        failed: validation.totalRows,
+        errors: [],
+        headerErrors: validation.headerValidation.missingRequired.map(
+          col => `العمود المطلوب غير موجود: ${col}`
+        ),
+        productsCreated: [],
+      };
+    }
+
+    if (validation.validRows.length === 0) {
+      return {
+        success: 0,
+        failed: validation.invalidRows.length,
+        errors: validation.invalidRows,
+        headerErrors: [],
+        productsCreated: [],
+      };
+    }
+
+    await this.ensureCanAddOrders(businessId, validation.validRows.length);
+
+    const productCache = new Map<string, string>();
+    const productsCreated: string[] = [];
+    let success = 0;
+    const insertErrors: Array<{ rowNumber: number; errors: RowValidationError[] }> = [];
+
+    const { data: existingProducts } = await supabase
+      .from('products')
+      .select('id, name_ar')
+      .eq('business_id', businessId);
+
+    if (existingProducts) {
+      for (const product of existingProducts) {
+        productCache.set(product.name_ar.toLowerCase().trim(), product.id);
+      }
+    }
+
+    const { data: defaultStatus } = await supabase
+      .from('statuses')
+      .select('id')
+      .eq('business_id', businessId)
+      .eq('key', 'new')
+      .maybeSingle();
+
+    for (const row of validation.validRows) {
+      try {
+        let productId: string | null = null;
+        const productKey = row.product.toLowerCase().trim();
+
+        if (productCache.has(productKey)) {
+          productId = productCache.get(productKey)!;
+        } else {
+          const { data: newProduct, error: productError } = await supabase
+            .from('products')
+            .insert({
+              business_id: businessId,
+              name_ar: row.product,
+              sku: `DRAFT-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
+              base_price: row.price,
+              is_active: true,
+            })
+            .select('id')
+            .single();
+
+          if (productError) {
+            console.error('Failed to create product:', productError);
+          } else if (newProduct) {
+            productId = newProduct.id;
+            productCache.set(productKey, newProduct.id);
+            productsCreated.push(row.product);
+          }
+        }
+
+        const timestamp = Date.now();
+        const random = Math.random().toString(36).substring(2, 6).toUpperCase();
+        const orderNumber = row.order_number || `ORD-${timestamp}-${random}`;
+
+        const orderData = {
+          business_id: businessId,
+          order_number: orderNumber,
+          order_date: row.date || new Date().toISOString().split('T')[0],
+          customer_name: row.customer_name,
+          customer_phone: row.phone,
+          customer_address: [row.city, row.address].filter(Boolean).join(' - ') || null,
+          status_id: defaultStatus?.id || null,
+          revenue: row.price * row.quantity,
+          cost: 0,
+          shipping_cost: 0,
+          notes: row.notes || null,
+        };
+
+        const { data: order, error: orderError } = await supabase
+          .from('orders')
+          .insert(orderData)
+          .select('id')
+          .single();
+
+        if (orderError) {
+          insertErrors.push({
+            rowNumber: row.rowNumber,
+            errors: [{
+              rowNumber: row.rowNumber,
+              column: 'Database',
+              message: orderError.message,
+            }],
+          });
+          continue;
+        }
+
+        if (productId && order) {
+          await supabase.from('order_items').insert({
+            order_id: order.id,
+            product_id: productId,
+            quantity: row.quantity,
+            unit_price: row.price,
+            total_price: row.price * row.quantity,
+          });
+        }
+
+        success++;
+      } catch (err: any) {
+        insertErrors.push({
+          rowNumber: row.rowNumber,
+          errors: [{
+            rowNumber: row.rowNumber,
+            column: 'System',
+            message: err.message || 'خطأ غير معروف',
+          }],
+        });
+      }
+    }
+
+    return {
+      success,
+      failed: validation.invalidRows.length + insertErrors.length,
+      errors: [...validation.invalidRows, ...insertErrors],
+      headerErrors: [],
+      productsCreated: [...new Set(productsCreated)],
+    };
+  }
+
   static async importOrdersCsv(
     businessId: string,
     userId: string,
     csvContent: string
   ): Promise<{ success: number; errors: string[] }> {
-    const lines = csvContent.split('\n').filter((line) => line.trim());
+    const result = await this.importOrdersStrict(businessId, userId, csvContent);
 
-    if (lines.length < 2) {
-      throw new Error('ملف CSV فارغ أو غير صحيح');
-    }
+    const errors: string[] = [
+      ...result.headerErrors,
+      ...result.errors.flatMap(e =>
+        e.errors.map(err => `الصف ${err.rowNumber}: ${err.message}${err.value ? ` (${err.value})` : ''}`)
+      ),
+    ];
 
-    const headers = lines[0].split(',').map((h) => h.trim().replace(/^"|"$/g, '').toLowerCase());
-    const dataLines = lines.slice(1);
-
-    await this.ensureCanAddOrders(businessId, dataLines.length);
-
-    let success = 0;
-    const errors: string[] = [];
-
-    for (let i = 0; i < dataLines.length; i++) {
-      try {
-        const values = this.parseCSVLine(dataLines[i]);
-
-        const orderData: any = {
-          business_id: businessId,
-          order_date: new Date().toISOString().split('T')[0],
-          revenue: 0,
-          cost: 0,
-          shipping_cost: 0,
-        };
-
-        let customerName = '';
-        let phoneNumber = '';
-        let governorate = '';
-        let cityAddress = '';
-        let productName = '';
-        let quantity = 1;
-        let price = 0;
-        let notes = '';
-
-        for (let j = 0; j < headers.length; j++) {
-          const header = headers[j];
-          const value = values[j]?.trim() || '';
-
-          if (header === 'customer name') {
-            customerName = value;
-          } else if (header === 'phone number') {
-            phoneNumber = value;
-          } else if (header === 'governorate') {
-            governorate = value;
-          } else if (header === 'city/address') {
-            cityAddress = value;
-          } else if (header === 'product name') {
-            productName = value;
-          } else if (header === 'quantity') {
-            quantity = parseInt(value) || 1;
-          } else if (header === 'price') {
-            price = parseFloat(value) || 0;
-          } else if (header === 'notes') {
-            notes = value;
-          }
-        }
-
-        if (!customerName) {
-          errors.push(`الصف ${i + 2}: اسم العميل مطلوب`);
-          continue;
-        }
-
-        const timestamp = Date.now();
-        const random = Math.random().toString(36).substring(2, 6).toUpperCase();
-        orderData.order_number = `ORD-${timestamp}-${random}`;
-        orderData.customer_name = customerName;
-        orderData.customer_phone = phoneNumber || null;
-        orderData.customer_address = [governorate, cityAddress].filter(Boolean).join(' - ') || null;
-        orderData.revenue = price * quantity;
-        orderData.notes = [
-          `المنتج: ${productName}`,
-          `الكمية: ${quantity}`,
-          notes ? `ملاحظات: ${notes}` : '',
-        ]
-          .filter(Boolean)
-          .join(' | ') || null;
-
-        const { error } = await supabase.from('orders').insert(orderData);
-
-        if (error) {
-          errors.push(`الصف ${i + 2}: ${error.message}`);
-        } else {
-          success++;
-        }
-      } catch (err: any) {
-        errors.push(`الصف ${i + 2}: ${err.message}`);
-      }
-    }
-
-    return { success, errors };
-  }
-
-  private static parseCSVLine(line: string): string[] {
-    const result: string[] = [];
-    let current = '';
-    let inQuotes = false;
-
-    for (let i = 0; i < line.length; i++) {
-      const char = line[i];
-
-      if (char === '"') {
-        if (inQuotes && line[i + 1] === '"') {
-          current += '"';
-          i++;
-        } else {
-          inQuotes = !inQuotes;
-        }
-      } else if (char === ',' && !inQuotes) {
-        result.push(current);
-        current = '';
-      } else {
-        current += char;
-      }
-    }
-
-    result.push(current);
-    return result;
+    return {
+      success: result.success,
+      errors,
+    };
   }
 
   static async createOrderMinimal(
