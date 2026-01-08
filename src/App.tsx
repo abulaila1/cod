@@ -24,6 +24,7 @@ import { Carriers } from '@/pages/app/Carriers';
 import { CarrierDetails } from '@/pages/app/CarrierDetails';
 import { Countries } from '@/pages/app/Countries';
 import { Employees } from '@/pages/app/Employees';
+import { EmployeeDetails } from '@/pages/app/EmployeeDetails';
 import { Reports } from '@/pages/app/Reports';
 import { Settings } from '@/pages/app/Settings';
 import { Workspace } from '@/pages/app/Workspace';
@@ -92,6 +93,7 @@ function App() {
                   <Route path="carriers/:id" element={<CarrierDetails />} />
                   <Route path="countries" element={<Countries />} />
                   <Route path="employees" element={<Employees />} />
+                  <Route path="employees/:id" element={<EmployeeDetails />} />
                   <Route path="reports" element={<Reports />} />
                   <Route path="settings" element={<Settings />} />
                   <Route path="workspace" element={<Workspace />} />
