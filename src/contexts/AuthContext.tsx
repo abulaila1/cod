@@ -50,9 +50,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const initializeAuth = async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      handleSessionChange(session);
+      await handleSessionChange(session);
     } catch (error) {
       console.error('Error initializing auth:', error);
+      setError(error instanceof Error ? error.message : 'خطأ في التحقق من الجلسة');
     } finally {
       setIsLoading(false);
     }

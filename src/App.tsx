@@ -10,6 +10,8 @@ import { Register } from '@/pages/auth/Register';
 import { ForgotPassword } from '@/pages/auth/ForgotPassword';
 import { ResetPassword } from '@/pages/auth/ResetPassword';
 import { CheckEmail } from '@/pages/auth/CheckEmail';
+import { AuthCallback } from '@/pages/auth/AuthCallback';
+import { Onboarding } from '@/pages/auth/Onboarding';
 
 import { Dashboard } from '@/pages/app/Dashboard';
 import { Orders } from '@/pages/app/Orders';
@@ -52,6 +54,9 @@ function App() {
               <Route path="/auth/forgot-password" element={<ForgotPassword />} />
               <Route path="/auth/reset-password" element={<ResetPassword />} />
               <Route path="/auth/check-email" element={<CheckEmail />} />
+              <Route path="/auth/callback" element={<AuthCallback />} />
+
+              <Route path="/onboarding" element={<Onboarding />} />
 
               <Route path="/invite/:token" element={<InviteAcceptance />} />
 
