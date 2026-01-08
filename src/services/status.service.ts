@@ -7,7 +7,7 @@ export class StatusService {
       .from('statuses')
       .select('*')
       .eq('business_id', businessId)
-      .order('sort_order', { ascending: true });
+      .order('display_order', { ascending: true });
 
     if (error) throw error;
     return data || [];
@@ -32,13 +32,11 @@ export class StatusService {
       .from('statuses')
       .insert({
         business_id: businessId,
-        key: input.key,
-        label_ar: input.label_ar,
-        sort_order: input.sort_order ?? 0,
-        is_final: input.is_final ?? false,
-        counts_as_delivered: input.counts_as_delivered ?? false,
-        counts_as_return: input.counts_as_return ?? false,
-        counts_as_active: input.counts_as_active ?? true,
+        name_ar: input.name_ar,
+        name_en: input.name_en || null,
+        color: input.color || '#6B7280',
+        is_default: input.is_default ?? false,
+        display_order: input.display_order ?? 0,
       })
       .select()
       .single();
@@ -77,13 +75,13 @@ export class StatusService {
   ): Promise<void> {
     const updates = statusIds.map((id, index) => ({
       id,
-      sort_order: index + 1,
+      display_order: index + 1,
     }));
 
     for (const update of updates) {
       await supabase
         .from('statuses')
-        .update({ sort_order: update.sort_order })
+        .update({ display_order: update.display_order })
         .eq('id', update.id)
         .eq('business_id', businessId);
     }

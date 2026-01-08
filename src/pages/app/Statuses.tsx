@@ -4,7 +4,11 @@ import { useBusiness } from '@/contexts/BusinessContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { StatusService } from '@/services';
 import type { Status, CreateStatusInput, UpdateStatusInput } from '@/types/domain';
-import { Plus, Edit2, Trash2, CheckCircle, XCircle, ArrowUp, ArrowDown } from 'lucide-react';
+import { Plus, Edit2, Trash2, ArrowUp, ArrowDown, Star } from 'lucide-react';
+
+const DEFAULT_COLORS = [
+  '#6B7280', '#EF4444', '#F59E0B', '#10B981', '#3B82F6', '#8B5CF6', '#EC4899'
+];
 
 export function Statuses() {
   const { currentBusiness } = useBusiness();
@@ -17,13 +21,11 @@ export function Statuses() {
   const [selectedStatus, setSelectedStatus] = useState<Status | null>(null);
 
   const [formData, setFormData] = useState<CreateStatusInput>({
-    key: '',
-    label_ar: '',
-    sort_order: 0,
-    is_final: false,
-    counts_as_delivered: false,
-    counts_as_return: false,
-    counts_as_active: true,
+    name_ar: '',
+    name_en: '',
+    color: '#6B7280',
+    is_default: false,
+    display_order: 0,
   });
 
   useEffect(() => {
@@ -50,10 +52,10 @@ export function Statuses() {
     if (!currentBusiness || !user) return;
 
     try {
-      const maxSortOrder = Math.max(...statuses.map(s => s.sort_order), 0);
+      const maxOrder = Math.max(...statuses.map(s => s.display_order || 0), 0);
       const newStatus = await StatusService.createStatus(currentBusiness.id, {
         ...formData,
-        sort_order: maxSortOrder + 1,
+        display_order: maxOrder + 1,
       });
 
       await StatusService.logStatusChange(
@@ -80,11 +82,10 @@ export function Statuses() {
     try {
       const before = { ...selectedStatus };
       const updateData: UpdateStatusInput = {
-        label_ar: formData.label_ar,
-        is_final: formData.is_final,
-        counts_as_delivered: formData.counts_as_delivered,
-        counts_as_return: formData.counts_as_return,
-        counts_as_active: formData.counts_as_active,
+        name_ar: formData.name_ar,
+        name_en: formData.name_en,
+        color: formData.color,
+        is_default: formData.is_default,
       };
 
       const updatedStatus = await StatusService.updateStatus(selectedStatus.id, updateData);
@@ -109,7 +110,7 @@ export function Statuses() {
   };
 
   const handleDelete = async (status: Status) => {
-    if (!confirm(`هل أنت متأكد من حذف الحالة "${status.label_ar}"؟`)) return;
+    if (!confirm(`هل أنت متأكد من حذف الحالة "${status.name_ar}"؟`)) return;
     if (!currentBusiness || !user) return;
 
     try {
@@ -168,26 +169,22 @@ export function Statuses() {
   const openEditModal = (status: Status) => {
     setSelectedStatus(status);
     setFormData({
-      key: status.key,
-      label_ar: status.label_ar,
-      sort_order: status.sort_order,
-      is_final: status.is_final,
-      counts_as_delivered: status.counts_as_delivered,
-      counts_as_return: status.counts_as_return,
-      counts_as_active: status.counts_as_active,
+      name_ar: status.name_ar,
+      name_en: status.name_en || '',
+      color: status.color || '#6B7280',
+      is_default: status.is_default || false,
+      display_order: status.display_order || 0,
     });
     setShowEditModal(true);
   };
 
   const resetForm = () => {
     setFormData({
-      key: '',
-      label_ar: '',
-      sort_order: 0,
-      is_final: false,
-      counts_as_delivered: false,
-      counts_as_return: false,
-      counts_as_active: true,
+      name_ar: '',
+      name_en: '',
+      color: '#6B7280',
+      is_default: false,
+      display_order: 0,
     });
   };
 
@@ -251,31 +248,24 @@ export function Statuses() {
                       </button>
                     </div>
 
+                    <div
+                      className="w-4 h-4 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: status.color || '#6B7280' }}
+                    />
+
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
-                        <h4 className="font-bold text-zinc-950">{status.label_ar}</h4>
-                        <code className="text-xs bg-zinc-200 px-2 py-1 rounded">
-                          {status.key}
-                        </code>
+                        <h4 className="font-bold text-zinc-950">{status.name_ar}</h4>
+                        {status.name_en && (
+                          <span className="text-xs text-zinc-500">({status.name_en})</span>
+                        )}
                       </div>
                       <div className="flex gap-2 mt-2">
-                        {status.is_final && (
-                          <Badge variant="default" size="sm">نهائية</Badge>
-                        )}
-                        {status.counts_as_delivered && (
+                        {status.is_default && (
                           <Badge variant="success" size="sm">
-                            <CheckCircle className="h-3 w-3 inline ml-1" />
-                            موصّلة
+                            <Star className="h-3 w-3 inline ml-1" />
+                            افتراضية
                           </Badge>
-                        )}
-                        {status.counts_as_return && (
-                          <Badge variant="danger" size="sm">
-                            <XCircle className="h-3 w-3 inline ml-1" />
-                            مرتجعة
-                          </Badge>
-                        )}
-                        {status.counts_as_active && (
-                          <Badge variant="default" size="sm">نشطة</Badge>
                         )}
                       </div>
                     </div>
@@ -313,62 +303,56 @@ export function Statuses() {
         >
           <div className="space-y-4">
             <Input
-              label="المفتاح (key)"
-              placeholder="new, confirmed, delivered..."
-              value={formData.key}
-              onChange={(e) => setFormData({ ...formData, key: e.target.value })}
-            />
-            <Input
               label="الاسم بالعربية"
               placeholder="طلبات جديدة"
-              value={formData.label_ar}
-              onChange={(e) => setFormData({ ...formData, label_ar: e.target.value })}
+              value={formData.name_ar}
+              onChange={(e) => setFormData({ ...formData, name_ar: e.target.value })}
+            />
+            <Input
+              label="الاسم بالإنجليزية (اختياري)"
+              placeholder="New Orders"
+              value={formData.name_en}
+              onChange={(e) => setFormData({ ...formData, name_en: e.target.value })}
             />
 
-            <div className="space-y-2">
-              <label className="flex items-center gap-2 cursor-pointer">
+            <div>
+              <label className="block text-sm font-medium text-zinc-700 mb-2">اللون</label>
+              <div className="flex gap-2 flex-wrap">
+                {DEFAULT_COLORS.map((color) => (
+                  <button
+                    key={color}
+                    type="button"
+                    onClick={() => setFormData({ ...formData, color })}
+                    className={`w-8 h-8 rounded-full border-2 transition-all ${
+                      formData.color === color ? 'border-zinc-900 scale-110' : 'border-transparent'
+                    }`}
+                    style={{ backgroundColor: color }}
+                  />
+                ))}
                 <input
-                  type="checkbox"
-                  checked={formData.is_final}
-                  onChange={(e) => setFormData({ ...formData, is_final: e.target.checked })}
-                  className="w-4 h-4 rounded border-zinc-300"
+                  type="color"
+                  value={formData.color}
+                  onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                  className="w-8 h-8 rounded-full cursor-pointer"
                 />
-                <span className="text-sm text-zinc-900">حالة نهائية</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={formData.counts_as_delivered}
-                  onChange={(e) => setFormData({ ...formData, counts_as_delivered: e.target.checked })}
-                  className="w-4 h-4 rounded border-zinc-300"
-                />
-                <span className="text-sm text-zinc-900">تُحسب كموصّلة</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={formData.counts_as_return}
-                  onChange={(e) => setFormData({ ...formData, counts_as_return: e.target.checked })}
-                  className="w-4 h-4 rounded border-zinc-300"
-                />
-                <span className="text-sm text-zinc-900">تُحسب كمرتجعة</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={formData.counts_as_active}
-                  onChange={(e) => setFormData({ ...formData, counts_as_active: e.target.checked })}
-                  className="w-4 h-4 rounded border-zinc-300"
-                />
-                <span className="text-sm text-zinc-900">تُحسب كنشطة</span>
-              </label>
+              </div>
             </div>
+
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={formData.is_default}
+                onChange={(e) => setFormData({ ...formData, is_default: e.target.checked })}
+                className="w-4 h-4 rounded border-zinc-300"
+              />
+              <span className="text-sm text-zinc-900">حالة افتراضية للطلبات الجديدة</span>
+            </label>
 
             <Button
               variant="accent"
               className="w-full"
               onClick={handleCreate}
-              disabled={!formData.key || !formData.label_ar}
+              disabled={!formData.name_ar}
             >
               إنشاء
             </Button>
@@ -387,61 +371,55 @@ export function Statuses() {
           title="تعديل الحالة"
         >
           <div className="space-y-4">
-            <div className="bg-zinc-50 p-3 rounded-lg">
-              <p className="text-sm text-zinc-600">المفتاح:</p>
-              <code className="text-sm font-medium text-zinc-950">{selectedStatus.key}</code>
-            </div>
-
             <Input
               label="الاسم بالعربية"
-              value={formData.label_ar}
-              onChange={(e) => setFormData({ ...formData, label_ar: e.target.value })}
+              value={formData.name_ar}
+              onChange={(e) => setFormData({ ...formData, name_ar: e.target.value })}
+            />
+            <Input
+              label="الاسم بالإنجليزية (اختياري)"
+              value={formData.name_en}
+              onChange={(e) => setFormData({ ...formData, name_en: e.target.value })}
             />
 
-            <div className="space-y-2">
-              <label className="flex items-center gap-2 cursor-pointer">
+            <div>
+              <label className="block text-sm font-medium text-zinc-700 mb-2">اللون</label>
+              <div className="flex gap-2 flex-wrap">
+                {DEFAULT_COLORS.map((color) => (
+                  <button
+                    key={color}
+                    type="button"
+                    onClick={() => setFormData({ ...formData, color })}
+                    className={`w-8 h-8 rounded-full border-2 transition-all ${
+                      formData.color === color ? 'border-zinc-900 scale-110' : 'border-transparent'
+                    }`}
+                    style={{ backgroundColor: color }}
+                  />
+                ))}
                 <input
-                  type="checkbox"
-                  checked={formData.is_final}
-                  onChange={(e) => setFormData({ ...formData, is_final: e.target.checked })}
-                  className="w-4 h-4 rounded border-zinc-300"
+                  type="color"
+                  value={formData.color}
+                  onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                  className="w-8 h-8 rounded-full cursor-pointer"
                 />
-                <span className="text-sm text-zinc-900">حالة نهائية</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={formData.counts_as_delivered}
-                  onChange={(e) => setFormData({ ...formData, counts_as_delivered: e.target.checked })}
-                  className="w-4 h-4 rounded border-zinc-300"
-                />
-                <span className="text-sm text-zinc-900">تُحسب كموصّلة</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={formData.counts_as_return}
-                  onChange={(e) => setFormData({ ...formData, counts_as_return: e.target.checked })}
-                  className="w-4 h-4 rounded border-zinc-300"
-                />
-                <span className="text-sm text-zinc-900">تُحسب كمرتجعة</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={formData.counts_as_active}
-                  onChange={(e) => setFormData({ ...formData, counts_as_active: e.target.checked })}
-                  className="w-4 h-4 rounded border-zinc-300"
-                />
-                <span className="text-sm text-zinc-900">تُحسب كنشطة</span>
-              </label>
+              </div>
             </div>
+
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={formData.is_default}
+                onChange={(e) => setFormData({ ...formData, is_default: e.target.checked })}
+                className="w-4 h-4 rounded border-zinc-300"
+              />
+              <span className="text-sm text-zinc-900">حالة افتراضية للطلبات الجديدة</span>
+            </label>
 
             <Button
               variant="accent"
               className="w-full"
               onClick={handleUpdate}
-              disabled={!formData.label_ar}
+              disabled={!formData.name_ar}
             >
               حفظ التغييرات
             </Button>

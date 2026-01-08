@@ -1,14 +1,12 @@
 export interface Status {
   id: string;
-  business_id: string;
-  key: string;
-  label_ar: string;
-  sort_order: number;
-  is_final: boolean;
-  counts_as_delivered: boolean;
-  counts_as_return: boolean;
-  counts_as_active: boolean;
-  created_at: string;
+  business_id?: string;
+  name_ar: string;
+  name_en?: string;
+  color?: string;
+  is_default?: boolean;
+  display_order?: number;
+  created_at?: string;
 }
 
 export interface Country {
@@ -98,22 +96,19 @@ export interface AuditLog {
 }
 
 export interface CreateStatusInput {
-  key: string;
-  label_ar: string;
-  sort_order?: number;
-  is_final?: boolean;
-  counts_as_delivered?: boolean;
-  counts_as_return?: boolean;
-  counts_as_active?: boolean;
+  name_ar: string;
+  name_en?: string;
+  color?: string;
+  is_default?: boolean;
+  display_order?: number;
 }
 
 export interface UpdateStatusInput {
-  label_ar?: string;
-  sort_order?: number;
-  is_final?: boolean;
-  counts_as_delivered?: boolean;
-  counts_as_return?: boolean;
-  counts_as_active?: boolean;
+  name_ar?: string;
+  name_en?: string;
+  color?: string;
+  is_default?: boolean;
+  display_order?: number;
 }
 
 export interface OrderWithRelations extends Order {

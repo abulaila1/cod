@@ -58,7 +58,7 @@ export class OrdersService {
       .select(
         `
         *,
-        status:statuses(id, key, label_ar, is_final, counts_as_delivered, counts_as_return, counts_as_active),
+        status:statuses(id, name_ar, name_en, color, is_default),
         country:countries(id, name_ar, currency),
         carrier:carriers(id, name_ar),
         employee:employees(id, name_ar, role)
@@ -141,10 +141,10 @@ export class OrdersService {
       .select(
         `
         *,
-        status:statuses!inner(id, key, label_ar, is_final, counts_as_delivered, counts_as_return, counts_as_active),
-        country:countries!inner(id, name_ar, currency),
-        carrier:carriers!inner(id, name_ar),
-        employee:employees!inner(id, name_ar, role)
+        status:statuses(id, name_ar, name_en, color, is_default),
+        country:countries(id, name_ar, currency),
+        carrier:carriers(id, name_ar),
+        employee:employees(id, name_ar, role)
       `
       )
       .eq('id', orderId)
@@ -212,12 +212,12 @@ export class OrdersService {
       action: 'status_change',
       before: {
         status_id: orderBefore.status_id,
-        status_label: orderBefore.status.label_ar,
+        status_label: orderBefore.status?.name_ar,
         note,
       },
       after: {
         status_id: orderAfter?.status_id,
-        status_label: orderAfter?.status.label_ar,
+        status_label: orderAfter?.status?.name_ar,
       },
     });
   }
@@ -314,11 +314,11 @@ export class OrdersService {
         action: 'bulk_status_change',
         before: {
           status_id: orderBefore.status_id,
-          status_label: orderBefore.status.label_ar,
+          status_label: orderBefore.status?.name_ar,
         },
         after: {
           status_id: orderAfter?.status_id,
-          status_label: orderAfter?.status.label_ar,
+          status_label: orderAfter?.status?.name_ar,
         },
       });
     }
@@ -439,7 +439,9 @@ export class OrdersService {
       .from('statuses')
       .select('id')
       .eq('business_id', businessId)
-      .eq('key', 'new')
+      .order('is_default', { ascending: false })
+      .order('display_order', { ascending: true })
+      .limit(1)
       .maybeSingle();
 
     for (const row of validation.validRows) {
