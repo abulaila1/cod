@@ -344,59 +344,65 @@ export function Dashboard() {
                 <p className="text-xs text-zinc-500 mt-0.5">تطور الإيرادات والربح الصافي</p>
               </div>
               <div className="p-5">
-                <ResponsiveContainer width="100%" height={280}>
-                  <AreaChart data={timeSeries}>
-                    <defs>
-                      <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                      </linearGradient>
-                      <linearGradient id="colorProfit" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                    <XAxis
-                      dataKey="date"
-                      stroke="#6b7280"
-                      fontSize={11}
-                      tickFormatter={(date) => {
-                        const d = new Date(date);
-                        return `${d.getDate()}/${d.getMonth() + 1}`;
-                      }}
-                    />
-                    <YAxis stroke="#6b7280" fontSize={11} />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: '#ffffff',
-                        border: '1px solid #e5e7eb',
-                        borderRadius: '8px',
-                        fontSize: '12px',
-                      }}
-                      formatter={(value: number) => formatCurrency(value)}
-                      labelFormatter={(date) => new Date(date).toLocaleDateString('ar-EG')}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="gross_sales"
-                      stroke="#3b82f6"
-                      strokeWidth={2}
-                      fillOpacity={1}
-                      fill="url(#colorRevenue)"
-                      name="المبيعات"
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="net_profit"
-                      stroke="#10b981"
-                      strokeWidth={2}
-                      fillOpacity={1}
-                      fill="url(#colorProfit)"
-                      name="الربح الصافي"
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
+                {timeSeries.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={280}>
+                    <AreaChart data={timeSeries}>
+                      <defs>
+                        <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
+                          <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                        </linearGradient>
+                        <linearGradient id="colorProfit" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                          <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                      <XAxis
+                        dataKey="date"
+                        stroke="#6b7280"
+                        fontSize={11}
+                        tickFormatter={(date) => {
+                          const d = new Date(date);
+                          return `${d.getDate()}/${d.getMonth() + 1}`;
+                        }}
+                      />
+                      <YAxis stroke="#6b7280" fontSize={11} />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: '#ffffff',
+                          border: '1px solid #e5e7eb',
+                          borderRadius: '8px',
+                          fontSize: '12px',
+                        }}
+                        formatter={(value: number) => formatCurrency(value)}
+                        labelFormatter={(date) => new Date(date).toLocaleDateString('ar-EG')}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="gross_sales"
+                        stroke="#3b82f6"
+                        strokeWidth={2}
+                        fillOpacity={1}
+                        fill="url(#colorRevenue)"
+                        name="المبيعات"
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="net_profit"
+                        stroke="#10b981"
+                        strokeWidth={2}
+                        fillOpacity={1}
+                        fill="url(#colorProfit)"
+                        name="الربح الصافي"
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-[280px] flex items-center justify-center text-sm text-zinc-500">
+                    لا توجد بيانات لعرض الرسم البياني
+                  </div>
+                )}
               </div>
             </Card>
 

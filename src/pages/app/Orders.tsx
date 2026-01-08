@@ -15,6 +15,7 @@ import { ImportModal } from '@/components/entity/ImportModal';
 import type { OrderFilters } from '@/types/domain';
 import { FileText, X } from 'lucide-react';
 import { generateOrderTemplate, validateOrderHeaders } from '@/utils/order-import';
+import { parseImportFile } from '@/utils/file-parser';
 
 export function Orders() {
   const { currentBusiness } = useBusiness();
@@ -117,50 +118,36 @@ export function Orders() {
       throw new Error('لم يتم تحديد وورك سبيس أو المستخدم');
     }
 
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
+    try {
+      const parsed = await parseImportFile(file);
 
-      reader.onload = async (e) => {
-        try {
-          const csvContent = e.target?.result as string;
-          const lines = csvContent.split('\n').filter((line) => line.trim());
+      const validation = validateOrderHeaders(parsed.headers);
 
-          if (lines.length < 2) {
-            reject(new Error('ملف CSV فارغ أو غير صحيح'));
-            return;
-          }
+      if (!validation.valid) {
+        throw new Error(
+          `تنسيق الملف غير صحيح. يرجى استخدام القالب الرسمي.\n\n` +
+          `✓ الأعمدة الموجودة (${validation.found.length}): ${validation.found.join(', ')}\n\n` +
+          `✗ الأعمدة المفقودة (${validation.missing.length}): ${validation.missing.join(', ')}\n\n` +
+          `الأعمدة المطلوبة بالترتيب:\nCustomer Name, Phone Number, Governorate, City/Address, Product Name, Quantity, Price, Notes`
+        );
+      }
 
-          const headers = lines[0].split(',').map((h) => h.trim().replace(/^"|"$/g, ''));
-          const validation = validateOrderHeaders(headers);
+      const csvContent = [
+        parsed.headers.join(','),
+        ...parsed.dataRows.map((row) => row.map((cell) => `"${cell}"`).join(',')),
+      ].join('\n');
 
-          if (!validation.valid) {
-            reject(
-              new Error(
-                `تنسيق الملف غير صحيح. يرجى استخدام القالب الرسمي.\n\nالأعمدة المفقودة: ${validation.missing.join(', ')}`
-              )
-            );
-            return;
-          }
+      const result = await OrdersService.importOrdersCsv(
+        currentBusiness.id,
+        user.id,
+        csvContent
+      );
 
-          const result = await OrdersService.importOrdersCsv(
-            currentBusiness.id,
-            user.id,
-            csvContent
-          );
-
-          loadOrders();
-          resolve(result);
-        } catch (error: any) {
-          reject(error);
-        }
-      };
-
-      reader.onerror = () => {
-        reject(new Error('فشل قراءة الملف'));
-      };
-
-      reader.readAsText(file);
-    });
+      loadOrders();
+      return result;
+    } catch (error: any) {
+      throw error;
+    }
   };
 
   const handleBulkUpdateStatus = async (statusId: string) => {

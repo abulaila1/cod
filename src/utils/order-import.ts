@@ -31,21 +31,24 @@ export interface OrderImportRow {
   notes: string;
 }
 
-export function validateOrderHeaders(headers: string[]): { valid: boolean; missing: string[] } {
+export function validateOrderHeaders(headers: string[]): { valid: boolean; missing: string[]; found: string[] } {
   const normalizedHeaders = headers.map((h) => h.trim().toLowerCase());
   const missing: string[] = [];
+  const found: string[] = [];
 
   for (const required of REQUIRED_ORDER_HEADERS) {
-    const found = normalizedHeaders.some((h) => h === required.toLowerCase());
-    if (!found) {
-      const index = REQUIRED_ORDER_HEADERS.indexOf(required);
-      missing.push(REQUIRED_ORDER_HEADERS_AR[index]);
+    const isFound = normalizedHeaders.some((h) => h === required.toLowerCase());
+    if (!isFound) {
+      missing.push(required);
+    } else {
+      found.push(required);
     }
   }
 
   return {
     valid: missing.length === 0,
     missing,
+    found,
   };
 }
 
