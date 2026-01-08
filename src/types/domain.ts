@@ -35,16 +35,30 @@ export interface Employee {
   created_at: string;
 }
 
+export interface ProductCategory {
+  id: string;
+  business_id: string;
+  name_ar: string;
+  name_en?: string | null;
+  color?: string;
+  display_order?: number;
+  created_at?: string;
+}
+
 export interface Product {
   id: string;
   business_id: string;
   name_ar: string;
-  name_en: string | null;
+  name_en?: string | null;
   sku: string | null;
+  price: number;
   cost: number;
+  category_id?: string | null;
+  category?: ProductCategory | null;
+  image_url?: string | null;
   is_active: boolean;
-  created_by: string | null;
-  created_at: string;
+  created_by?: string | null;
+  created_at?: string;
   physical_stock: number;
   reserved_stock: number;
 }

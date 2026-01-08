@@ -6,7 +6,8 @@ export const IMPORT_SCHEMA = {
     { key: 'phone', label: 'Phone', labelAr: 'رقم الهاتف', required: true },
     { key: 'city', label: 'City', labelAr: 'المدينة', required: false },
     { key: 'address', label: 'Address', labelAr: 'العنوان', required: false },
-    { key: 'product', label: 'Product', labelAr: 'المنتج', required: true },
+    { key: 'sku', label: 'SKU', labelAr: 'رمز المنتج', required: true },
+    { key: 'product', label: 'Product', labelAr: 'المنتج', required: false },
     { key: 'quantity', label: 'Quantity', labelAr: 'الكمية', required: true },
     { key: 'price', label: 'Price', labelAr: 'السعر', required: true },
     { key: 'status', label: 'Status', labelAr: 'الحالة', required: false },
@@ -34,7 +35,8 @@ export interface ImportRowData {
   phone: string;
   city?: string;
   address?: string;
-  product: string;
+  sku: string;
+  product?: string;
   quantity: number;
   price: number;
   status?: string;
@@ -118,6 +120,16 @@ function matchColumn(header: string): ColumnKey | null {
     'العنوان': 'address',
     'city_address': 'address',
     'المدينةالعنوان': 'address',
+
+    'sku': 'sku',
+    'رمز_المنتج': 'sku',
+    'رمزالمنتج': 'sku',
+    'كود_المنتج': 'sku',
+    'كودالمنتج': 'sku',
+    'product_code': 'sku',
+    'productcode': 'sku',
+    'barcode': 'sku',
+    'الباركود': 'sku',
 
     'product': 'product',
     'product_name': 'product',
@@ -264,16 +276,20 @@ export function validateRow(
         data.address = rawValue || undefined;
         break;
 
-      case 'product':
+      case 'sku':
         if (!rawValue) {
           errors.push({
             rowNumber,
-            column: 'Product',
-            message: 'اسم المنتج مطلوب',
+            column: 'SKU',
+            message: 'رمز المنتج (SKU) مطلوب',
           });
         } else {
-          data.product = rawValue;
+          data.sku = rawValue.trim();
         }
+        break;
+
+      case 'product':
+        data.product = rawValue || undefined;
         break;
 
       case 'quantity':
@@ -459,9 +475,9 @@ export function generateOrderTemplate(): string {
   const headers = IMPORT_SCHEMA.columns.map(col => col.label);
 
   const exampleRows = [
-    ['ORD-001', '2024-01-15', 'أحمد محمد', '0501234567', 'الرياض', 'حي النسيم، شارع 15', 'ساعة ذكية', '2', '299.00', 'New', 'طلب مستعجل'],
-    ['ORD-002', '2024-01-15', 'سارة علي', '0551234567', 'جدة', 'حي الصفا', 'سماعة بلوتوث', '1', '150.00', 'Confirmed', ''],
-    ['', '', 'محمد أحمد', '0561234567', 'الدمام', 'شارع الملك فهد', 'شاحن لاسلكي', '3', '89.00', '', 'تسليم للمكتب'],
+    ['ORD-001', '2024-01-15', 'Ahmad Mohamed', '0501234567', 'Riyadh', 'Naseem District, Street 15', 'WATCH-001', 'Smart Watch', '2', '299.00', 'New', 'Urgent order'],
+    ['ORD-002', '2024-01-15', 'Sara Ali', '0551234567', 'Jeddah', 'Safa District', 'EARBUDS-002', 'Bluetooth Earbuds', '1', '150.00', 'Confirmed', ''],
+    ['', '', 'Mohamed Ahmed', '0561234567', 'Dammam', 'King Fahd Street', 'CHARGER-003', 'Wireless Charger', '3', '89.00', '', 'Office delivery'],
   ];
 
   const csvRows = [
@@ -480,9 +496,9 @@ export function generateOrderTemplateArabic(): string {
   const headers = IMPORT_SCHEMA.columns.map(col => col.labelAr);
 
   const exampleRows = [
-    ['ORD-001', '2024-01-15', 'أحمد محمد', '0501234567', 'الرياض', 'حي النسيم، شارع 15', 'ساعة ذكية', '2', '299.00', 'جديد', 'طلب مستعجل'],
-    ['ORD-002', '2024-01-15', 'سارة علي', '0551234567', 'جدة', 'حي الصفا', 'سماعة بلوتوث', '1', '150.00', 'مؤكد', ''],
-    ['', '', 'محمد أحمد', '0561234567', 'الدمام', 'شارع الملك فهد', 'شاحن لاسلكي', '3', '89.00', '', 'تسليم للمكتب'],
+    ['ORD-001', '2024-01-15', 'أحمد محمد', '0501234567', 'الرياض', 'حي النسيم، شارع 15', 'WATCH-001', 'ساعة ذكية', '2', '299.00', 'جديد', 'طلب مستعجل'],
+    ['ORD-002', '2024-01-15', 'سارة علي', '0551234567', 'جدة', 'حي الصفا', 'EARBUDS-002', 'سماعة بلوتوث', '1', '150.00', 'مؤكد', ''],
+    ['', '', 'محمد أحمد', '0561234567', 'الدمام', 'شارع الملك فهد', 'CHARGER-003', 'شاحن لاسلكي', '3', '89.00', '', 'تسليم للمكتب'],
   ];
 
   const csvRows = [

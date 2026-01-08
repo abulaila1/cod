@@ -419,19 +419,22 @@ export class OrdersService {
 
     await this.ensureCanAddOrders(businessId, validation.validRows.length);
 
-    const productCache = new Map<string, string>();
+    const skuCache = new Map<string, { id: string; cost: number }>();
     const productsCreated: string[] = [];
     let success = 0;
     const insertErrors: Array<{ rowNumber: number; errors: RowValidationError[] }> = [];
 
     const { data: existingProducts } = await supabase
       .from('products')
-      .select('id, name_ar')
-      .eq('business_id', businessId);
+      .select('id, sku, cost')
+      .eq('business_id', businessId)
+      .not('sku', 'is', null);
 
     if (existingProducts) {
       for (const product of existingProducts) {
-        productCache.set(product.name_ar.toLowerCase().trim(), product.id);
+        if (product.sku) {
+          skuCache.set(product.sku.toLowerCase().trim(), { id: product.id, cost: product.cost || 0 });
+        }
       }
     }
 
@@ -446,36 +449,26 @@ export class OrdersService {
 
     for (const row of validation.validRows) {
       try {
-        let productId: string | null = null;
-        const productKey = row.product.toLowerCase().trim();
+        const skuKey = row.sku.toLowerCase().trim();
+        const productData = skuCache.get(skuKey);
 
-        if (productCache.has(productKey)) {
-          productId = productCache.get(productKey)!;
-        } else {
-          const { data: newProduct, error: productError } = await supabase
-            .from('products')
-            .insert({
-              business_id: businessId,
-              name_ar: row.product,
-              sku: `DRAFT-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
-              base_price: row.price,
-              is_active: true,
-            })
-            .select('id')
-            .single();
-
-          if (productError) {
-            console.error('Failed to create product:', productError);
-          } else if (newProduct) {
-            productId = newProduct.id;
-            productCache.set(productKey, newProduct.id);
-            productsCreated.push(row.product);
-          }
+        if (!productData) {
+          insertErrors.push({
+            rowNumber: row.rowNumber,
+            errors: [{
+              rowNumber: row.rowNumber,
+              column: 'SKU',
+              message: `المنتج برمز "${row.sku}" غير موجود. يجب إضافة المنتج أولاً من صفحة المنتجات.`,
+            }],
+          });
+          continue;
         }
 
         const timestamp = Date.now();
         const random = Math.random().toString(36).substring(2, 6).toUpperCase();
         const orderNumber = row.order_number || `ORD-${timestamp}-${random}`;
+
+        const productCost = productData.cost * row.quantity;
 
         const orderData = {
           business_id: businessId,
@@ -486,7 +479,7 @@ export class OrdersService {
           customer_address: [row.city, row.address].filter(Boolean).join(' - ') || null,
           status_id: defaultStatus?.id || null,
           revenue: row.price * row.quantity,
-          cost: 0,
+          cost: productCost,
           shipping_cost: 0,
           notes: row.notes || null,
         };
@@ -509,10 +502,10 @@ export class OrdersService {
           continue;
         }
 
-        if (productId && order) {
+        if (order) {
           await supabase.from('order_items').insert({
             order_id: order.id,
-            product_id: productId,
+            product_id: productData.id,
             quantity: row.quantity,
             unit_price: row.price,
             total_price: row.price * row.quantity,
