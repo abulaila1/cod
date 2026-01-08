@@ -29,7 +29,7 @@ const POPULAR_COUNTRIES = [
 ];
 
 export function Countries() {
-  const { currentBusiness } = useBusiness();
+  const { currentBusiness, refreshCountry } = useBusiness();
   const [country, setCountry] = useState<Country | null>(null);
   const [cities, setCities] = useState<City[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -130,7 +130,8 @@ export function Countries() {
     try {
       await CountriesService.createOrUpdateCountry(currentBusiness.id, countryForm);
       setShowCountryModal(false);
-      loadData();
+      await loadData();
+      await refreshCountry();
     } catch (error) {
       console.error('Failed to save country:', error);
       alert('فشل حفظ الدولة');

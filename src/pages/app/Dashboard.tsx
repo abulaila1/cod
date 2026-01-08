@@ -7,21 +7,8 @@ import { useBusiness } from '@/contexts/BusinessContext';
 import { Card } from '@/components/ui/Card';
 import { Skeleton } from '@/components/common/Skeleton';
 
-const formatCurrency = (amount: number, currency = 'USD') => {
-  try {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: currency,
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 2,
-    }).format(amount);
-  } catch {
-    return `${amount} ${currency}`;
-  }
-};
-
 export function Dashboard() {
-  const { currentBusiness } = useBusiness();
+  const { currentBusiness, formatCurrency } = useBusiness();
   const { orders, isLoading } = useOrdersList(currentBusiness?.id);
 
   const metrics = useMemo(() => {
@@ -82,7 +69,7 @@ export function Dashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="صافي الربح"
-          value={formatCurrency(metrics?.netProfit || 0, currentBusiness?.currency)}
+          value={formatCurrency(metrics?.netProfit || 0)}
           icon={<DollarSign className="w-5 h-5 text-emerald-600" />}
           color="emerald"
         />

@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useAuth } from './AuthContext';
 import { supabase } from '@/services/supabase';
 
@@ -18,16 +18,29 @@ interface BusinessMember {
   status: 'active' | 'suspended';
 }
 
+interface WorkspaceCountry {
+  id: string;
+  name_ar: string;
+  name_en?: string;
+  code: string;
+  currency: string;
+  currency_symbol: string;
+}
+
 interface BusinessContextValue {
   currentBusiness: Business | null;
   businesses: Business[];
   membership: BusinessMember | null;
+  country: WorkspaceCountry | null;
   isLoading: boolean;
   error: string | null;
   isSuspended: boolean;
   switchBusiness: (businessId: string) => void;
   refreshBusinesses: () => Promise<void>;
+  refreshCountry: () => Promise<void>;
   ensureWorkspace: () => Promise<Business | null>;
+  formatCurrency: (amount: number) => string;
+  getCurrencySymbol: () => string;
 }
 
 const BusinessContext = createContext<BusinessContextValue | undefined>(undefined);
@@ -37,8 +50,31 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
   const [currentBusiness, setCurrentBusiness] = useState<Business | null>(null);
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [membership, setMembership] = useState<BusinessMember | null>(null);
+  const [country, setCountry] = useState<WorkspaceCountry | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const loadCountry = useCallback(async (businessId: string) => {
+    try {
+      const { data, error: countryError } = await supabase
+        .from('countries')
+        .select('id, name_ar, name_en, code, currency, currency_symbol')
+        .eq('business_id', businessId)
+        .limit(1)
+        .maybeSingle();
+
+      if (countryError) {
+        console.error('Error loading country:', countryError);
+        setCountry(null);
+        return;
+      }
+
+      setCountry(data);
+    } catch (err) {
+      console.error('Error loading country:', err);
+      setCountry(null);
+    }
+  }, []);
 
   useEffect(() => {
     if (isAuthenticated && user) {
@@ -47,9 +83,18 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
       setCurrentBusiness(null);
       setBusinesses([]);
       setMembership(null);
+      setCountry(null);
       setIsLoading(false);
     }
   }, [isAuthenticated, user]);
+
+  useEffect(() => {
+    if (currentBusiness) {
+      loadCountry(currentBusiness.id);
+    } else {
+      setCountry(null);
+    }
+  }, [currentBusiness, loadCountry]);
 
   const loadBusinesses = async () => {
     try {
@@ -122,6 +167,12 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const refreshCountry = async () => {
+    if (currentBusiness) {
+      await loadCountry(currentBusiness.id);
+    }
+  };
+
   const ensureWorkspace = async (): Promise<Business | null> => {
     try {
       const { data: existingBusinesses } = await supabase
@@ -171,6 +222,20 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const formatCurrency = useCallback((amount: number): string => {
+    const formatted = new Intl.NumberFormat('ar-SA', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    }).format(amount);
+
+    const symbol = country?.currency_symbol || '';
+    return symbol ? `${formatted} ${symbol}` : formatted;
+  }, [country]);
+
+  const getCurrencySymbol = useCallback((): string => {
+    return country?.currency_symbol || '';
+  }, [country]);
+
   const isSuspended = currentBusiness?.status === 'suspended';
 
   return (
@@ -179,12 +244,16 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
         currentBusiness,
         businesses,
         membership,
+        country,
         isLoading,
         error,
         isSuspended,
         switchBusiness,
         refreshBusinesses,
+        refreshCountry,
         ensureWorkspace,
+        formatCurrency,
+        getCurrencySymbol,
       }}
     >
       {children}

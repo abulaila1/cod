@@ -1,4 +1,5 @@
 import { Button, Card, Select } from '@/components/ui';
+import { useBusiness } from '@/contexts/BusinessContext';
 import type { OrderWithRelations, Status } from '@/types/domain';
 import { Eye } from 'lucide-react';
 
@@ -33,13 +34,7 @@ export function OrdersTable({
   onPageChange,
   onPageSizeChange,
 }: OrdersTableProps) {
-  const formatCurrency = (num: number): string => {
-    return new Intl.NumberFormat('ar-EG', {
-      style: 'decimal',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(num);
-  };
+  const { formatCurrency } = useBusiness();
 
   const formatDate = (date: string): string => {
     return new Date(date).toLocaleDateString('ar-EG', {

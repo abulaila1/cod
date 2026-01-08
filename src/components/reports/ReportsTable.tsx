@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, Button } from '@/components/ui';
+import { useBusiness } from '@/contexts/BusinessContext';
 import type { ReportRow, ReportGroupBy } from '@/types/reports';
 import { Eye, ArrowUpDown } from 'lucide-react';
 
@@ -12,16 +13,9 @@ interface ReportsTableProps {
 
 export function ReportsTable({ rows, groupBy, filters }: ReportsTableProps) {
   const navigate = useNavigate();
+  const { formatCurrency } = useBusiness();
   const [sortBy, setSortBy] = useState<'net_profit' | 'gross_sales' | 'delivery_rate'>('net_profit');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
-
-  const formatCurrency = (num: number): string => {
-    return new Intl.NumberFormat('ar-EG', {
-      style: 'decimal',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(num);
-  };
 
   const formatPercent = (num: number): string => {
     return num.toFixed(1) + '%';
@@ -142,7 +136,7 @@ export function ReportsTable({ rows, groupBy, filters }: ReportsTableProps) {
                     </span>
                   </td>
                   <td className="px-6 py-4 text-sm font-medium text-zinc-950">
-                    {formatCurrency(row.gross_sales)} ج.م
+                    {formatCurrency(row.gross_sales)}
                   </td>
                   <td className="px-6 py-4">
                     <span
@@ -150,11 +144,11 @@ export function ReportsTable({ rows, groupBy, filters }: ReportsTableProps) {
                         row.net_profit >= 0 ? 'text-green-600' : 'text-red-600'
                       }`}
                     >
-                      {formatCurrency(row.net_profit)} ج.م
+                      {formatCurrency(row.net_profit)}
                     </span>
                   </td>
                   <td className="px-6 py-4 text-sm text-zinc-950">
-                    {formatCurrency(row.aov)} ج.م
+                    {formatCurrency(row.aov)}
                   </td>
                   <td className="px-6 py-4">
                     <Button

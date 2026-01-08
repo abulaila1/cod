@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, Button, Badge, Input } from '@/components/ui';
+import { useBusiness } from '@/contexts/BusinessContext';
 import type { PerformanceBreakdown, ProductPerformance } from '@/types/performance';
 import { Eye, Search, TrendingUp, TrendingDown } from 'lucide-react';
 
@@ -13,6 +14,7 @@ interface RankingTableProps {
 
 export function RankingTable({ data, type, dateFrom, dateTo }: RankingTableProps) {
   const navigate = useNavigate();
+  const { formatCurrency } = useBusiness();
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'delivery_rate' | 'net_profit' | 'total_orders'>('net_profit');
 
@@ -25,14 +27,6 @@ export function RankingTable({ data, type, dateFrom, dateTo }: RankingTableProps
     if (sortBy === 'net_profit') return b.net_profit - a.net_profit;
     return b.total_orders - a.total_orders;
   });
-
-  const formatCurrency = (num: number): string => {
-    return new Intl.NumberFormat('ar-EG', {
-      style: 'decimal',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(num);
-  };
 
   const formatPercent = (num: number): string => {
     return num.toFixed(1) + '%';
@@ -161,11 +155,11 @@ export function RankingTable({ data, type, dateFrom, dateTo }: RankingTableProps
                     </span>
                   </td>
                   <td className="px-6 py-4 text-sm font-medium text-zinc-950">
-                    {formatCurrency(item.gross_sales)} ج.م
+                    {formatCurrency(item.gross_sales)}
                   </td>
                   <td className="px-6 py-4">
                     <span className={`text-sm font-bold ${item.net_profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {formatCurrency(item.net_profit)} ج.م
+                      {formatCurrency(item.net_profit)}
                     </span>
                   </td>
                   <td className="px-6 py-4">

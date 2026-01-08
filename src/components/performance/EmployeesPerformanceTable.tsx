@@ -1,4 +1,5 @@
 import { Card, Badge } from '@/components/ui';
+import { useBusiness } from '@/contexts/BusinessContext';
 import { Trophy, TrendingUp } from 'lucide-react';
 import type { PerformanceBreakdown } from '@/types/performance';
 
@@ -8,16 +9,10 @@ interface EmployeesPerformanceTableProps {
 }
 
 export function EmployeesPerformanceTable({ data, isLoading }: EmployeesPerformanceTableProps) {
+  const { formatCurrency } = useBusiness();
+
   const formatPercent = (num: number): string => {
     return num.toFixed(1) + '%';
-  };
-
-  const formatCurrency = (num: number): string => {
-    return new Intl.NumberFormat('ar-EG', {
-      style: 'decimal',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(num);
   };
 
   const calculateBonus = (deliveryRate: number, totalOrders: number): number => {
@@ -129,7 +124,7 @@ export function EmployeesPerformanceTable({ data, isLoading }: EmployeesPerforma
                     <td className="px-6 py-4">
                       {bonus > 0 ? (
                         <Badge className="bg-emerald-100 text-emerald-800 font-semibold">
-                          {formatCurrency(bonus)} ج.م
+                          {formatCurrency(bonus)}
                         </Badge>
                       ) : (
                         <span className="text-sm text-zinc-500">-</span>

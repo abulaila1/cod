@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Card, Button, Input, Badge } from '@/components/ui';
+import { useBusiness } from '@/contexts/BusinessContext';
 import { Edit, Save, X, TrendingUp, TrendingDown, AlertCircle } from 'lucide-react';
 
 interface CountryPerformanceData {
@@ -26,16 +27,9 @@ export function CountriesPerformanceTable({
   isLoading,
   onUpdateShippingCost
 }: CountriesPerformanceTableProps) {
+  const { formatCurrency } = useBusiness();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<string>('');
-
-  const formatCurrency = (num: number): string => {
-    return new Intl.NumberFormat('ar-EG', {
-      style: 'decimal',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(num);
-  };
 
   const getPerformanceStatus = (deliveryRate: number, netProfit: number) => {
     if (deliveryRate >= 70 && netProfit > 0) {
@@ -143,18 +137,18 @@ export function CountriesPerformanceTable({
                         />
                       ) : (
                         <span className="text-sm text-zinc-950">
-                          {formatCurrency(item.shipping_cost || 0)} ج.م
+                          {formatCurrency(item.shipping_cost || 0)}
                         </span>
                       )}
                     </td>
                     <td className="px-6 py-4 text-sm text-zinc-950">
-                      {formatCurrency(item.cod_fees || 0)} ج.م
+                      {formatCurrency(item.cod_fees || 0)}
                     </td>
                     <td className="px-6 py-4">
                       <span className={`text-sm font-semibold ${
                         item.net_profit >= 0 ? 'text-green-600' : 'text-red-600'
                       }`}>
-                        {formatCurrency(item.net_profit)} ج.م
+                        {formatCurrency(item.net_profit)}
                       </span>
                     </td>
                     <td className="px-6 py-4">

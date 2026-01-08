@@ -1,4 +1,5 @@
 import { Card, CardHeader, CardContent } from '@/components/ui';
+import { useBusiness } from '@/contexts/BusinessContext';
 import type { ReportSummary } from '@/types/reports';
 import { TrendingUp, TrendingDown, Package, CheckCircle, XCircle, DollarSign } from 'lucide-react';
 
@@ -8,13 +9,7 @@ interface ReportsSummaryProps {
 }
 
 export function ReportsSummary({ summary, isLoading }: ReportsSummaryProps) {
-  const formatCurrency = (num: number): string => {
-    return new Intl.NumberFormat('ar-EG', {
-      style: 'decimal',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(num);
-  };
+  const { formatCurrency } = useBusiness();
 
   const formatPercent = (num: number): string => {
     return num.toFixed(1) + '%';
@@ -51,14 +46,14 @@ export function ReportsSummary({ summary, isLoading }: ReportsSummaryProps) {
     },
     {
       title: 'إجمالي المبيعات',
-      value: formatCurrency(summary.gross_sales) + ' ج.م',
+      value: formatCurrency(summary.gross_sales),
       icon: DollarSign,
-      color: 'text-purple-600',
-      bgColor: 'bg-purple-50',
+      color: 'text-emerald-600',
+      bgColor: 'bg-emerald-50',
     },
     {
       title: 'صافي الربح',
-      value: formatCurrency(summary.net_profit) + ' ج.م',
+      value: formatCurrency(summary.net_profit),
       icon: summary.net_profit >= 0 ? TrendingUp : TrendingDown,
       color: summary.net_profit >= 0 ? 'text-green-600' : 'text-red-600',
       bgColor: summary.net_profit >= 0 ? 'bg-green-50' : 'bg-red-50',

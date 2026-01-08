@@ -28,7 +28,7 @@ const CATEGORY_COLORS = [
 ];
 
 export function Products() {
-  const { currentBusiness } = useBusiness();
+  const { currentBusiness, formatCurrency, getCurrencySymbol } = useBusiness();
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -339,10 +339,6 @@ export function Products() {
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
-  };
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('ar-SA', { minimumFractionDigits: 0 }).format(amount);
   };
 
   if (!currentBusiness) {
