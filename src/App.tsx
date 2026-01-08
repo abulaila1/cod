@@ -3,6 +3,7 @@ import { ToastProvider } from '@/components/ui';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { BusinessProvider } from '@/contexts/BusinessContext';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import { OnboardingRoute } from '@/components/auth/OnboardingRoute';
 
 import { Home } from '@/pages/public/Home';
 import { Login } from '@/pages/auth/Login';
@@ -56,7 +57,14 @@ function App() {
               <Route path="/auth/check-email" element={<CheckEmail />} />
               <Route path="/auth/callback" element={<AuthCallback />} />
 
-              <Route path="/onboarding" element={<Onboarding />} />
+              <Route
+                path="/onboarding"
+                element={
+                  <OnboardingRoute>
+                    <Onboarding />
+                  </OnboardingRoute>
+                }
+              />
 
               <Route path="/invite/:token" element={<InviteAcceptance />} />
 

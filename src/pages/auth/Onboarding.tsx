@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/services/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { useBusiness } from '@/contexts/BusinessContext';
 import { AuthLayout } from '@/components/layout';
 import { Button, Input, Select } from '@/components/ui';
 import { Store, Loader2, AlertCircle, CheckCircle } from 'lucide-react';
@@ -41,6 +42,7 @@ const COUNTRIES = [
 export function Onboarding() {
   const navigate = useNavigate();
   const { user, checkWorkspaceStatus } = useAuth();
+  const { refreshBusinesses } = useBusiness();
   const [storeName, setStoreName] = useState('متجري');
   const [currency, setCurrency] = useState('USD');
   const [country, setCountry] = useState('SA');
@@ -133,13 +135,16 @@ export function Onboarding() {
 
       setSuccess(true);
 
-      await checkWorkspaceStatus();
-
       localStorage.setItem('currentBusinessId', business.id);
+
+      await checkWorkspaceStatus();
+      await refreshBusinesses();
+
+      console.log('Workspace creation complete, redirecting to dashboard');
 
       setTimeout(() => {
         navigate('/app/dashboard', { replace: true });
-      }, 1000);
+      }, 500);
     } catch (err) {
       console.error('Error creating workspace:', err);
       setError(err instanceof Error ? err.message : 'فشل إنشاء الوورك سبيس');
