@@ -45,6 +45,12 @@ import { AccountSuspended } from '@/pages/app/AccountSuspended';
 
 import { EmployeeLogin } from '@/pages/employee/EmployeeLogin';
 import { EmployeeDashboard } from '@/pages/employee/EmployeeDashboard';
+import { EmployeeOrders } from '@/pages/employee/EmployeeOrders';
+import { EmployeeProducts } from '@/pages/employee/EmployeeProducts';
+import { EmployeeReports } from '@/pages/employee/EmployeeReports';
+import { EmployeeStatuses } from '@/pages/employee/EmployeeStatuses';
+import { EmployeeCarriers } from '@/pages/employee/EmployeeCarriers';
+import { EmployeeCountries } from '@/pages/employee/EmployeeCountries';
 
 import { ConfigurationError } from '@/components/common/ConfigurationError';
 import { isSupabaseConfigured } from '@/services/supabase';
@@ -126,6 +132,54 @@ function App() {
                   element={
                     <EmployeeProtectedRoute>
                       <EmployeeDashboard />
+                    </EmployeeProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/employee/orders"
+                  element={
+                    <EmployeeProtectedRoute>
+                      <EmployeeOrders />
+                    </EmployeeProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/employee/products"
+                  element={
+                    <EmployeeProtectedRoute>
+                      <EmployeeProducts />
+                    </EmployeeProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/employee/reports"
+                  element={
+                    <EmployeeProtectedRoute>
+                      <EmployeeReports />
+                    </EmployeeProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/employee/statuses"
+                  element={
+                    <EmployeeProtectedRoute>
+                      <EmployeeStatuses />
+                    </EmployeeProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/employee/carriers"
+                  element={
+                    <EmployeeProtectedRoute>
+                      <EmployeeCarriers />
+                    </EmployeeProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/employee/countries"
+                  element={
+                    <EmployeeProtectedRoute>
+                      <EmployeeCountries />
                     </EmployeeProtectedRoute>
                   }
                 />

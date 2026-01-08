@@ -1,11 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useEmployee } from '@/contexts/EmployeeContext';
-import { useToast } from '@/components/ui/Toast';
-import { Button } from '@/components/ui';
+import { EmployeeLayout } from '@/components/layout/EmployeeLayout';
 import {
-  Briefcase,
-  LogOut,
   Package,
   Clock,
   CheckCircle,
@@ -16,8 +13,7 @@ import {
 
 export function EmployeeDashboard() {
   const navigate = useNavigate();
-  const { employee, logout } = useEmployee();
-  const { showToast } = useToast();
+  const { employee } = useEmployee();
 
   useEffect(() => {
     if (!employee) {
@@ -25,49 +21,13 @@ export function EmployeeDashboard() {
     }
   }, [employee, navigate]);
 
-  const handleLogout = () => {
-    logout();
-    showToast('success', 'تم تسجيل الخروج بنجاح');
-    navigate('/employee/login');
-  };
-
   if (!employee) {
     return null;
   }
 
-  const hasPermission = (key: string) => {
-    return employee.permissions?.includes(key);
-  };
-
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="bg-white border-b border-slate-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
-                <Briefcase className="h-6 w-6 text-white" />
-              </div>
-              <div>
-                <h1 className="text-lg font-semibold text-slate-900">
-                  مرحباً، {employee.name_ar}
-                </h1>
-                <p className="text-sm text-slate-500">لوحة تحكم الموظف</p>
-              </div>
-            </div>
-            <Button
-              variant="secondary"
-              onClick={handleLogout}
-              className="flex items-center gap-2"
-            >
-              <LogOut className="h-4 w-4" />
-              تسجيل الخروج
-            </Button>
-          </div>
-        </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <EmployeeLayout>
+      <div className="max-w-7xl mx-auto">
         <div className="mb-8">
           <h2 className="text-2xl font-bold text-slate-900 mb-2">لوحة التحكم</h2>
           <p className="text-slate-600">
@@ -108,8 +68,8 @@ export function EmployeeDashboard() {
 
           <div className="bg-white rounded-xl p-6 border border-slate-200">
             <div className="flex items-center justify-between mb-4">
-              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                <TrendingUp className="h-6 w-6 text-purple-600" />
+              <div className="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center">
+                <TrendingUp className="h-6 w-6 text-emerald-600" />
               </div>
             </div>
             <h3 className="text-2xl font-bold text-slate-900 mb-1">0%</h3>
@@ -175,8 +135,8 @@ export function EmployeeDashboard() {
             </div>
           </div>
         </div>
-      </main>
-    </div>
+      </div>
+    </EmployeeLayout>
   );
 }
 
