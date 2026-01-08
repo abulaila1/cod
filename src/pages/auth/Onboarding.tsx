@@ -70,70 +70,26 @@ export function Onboarding() {
     try {
       console.log('Creating workspace for user:', user.id);
 
-      const { data: business, error: businessError } = await supabase
-        .from('businesses')
-        .insert({
-          name: storeName.trim(),
-          created_by: user.id,
-          settings: {
-            currency,
-            country,
-          },
-        })
-        .select('id')
-        .single();
+      const { data, error: rpcError } = await supabase.rpc('create_workspace_v2', {
+        business_name: storeName.trim(),
+        currency_code: currency,
+        country_code: country,
+      });
 
-      if (businessError) {
-        console.error('Error creating business:', businessError);
-        throw new Error(`فشل إنشاء المتجر: ${businessError.message}`);
+      if (rpcError) {
+        console.error('Error creating workspace:', rpcError);
+        throw new Error(`فشل إنشاء المتجر: ${rpcError.message}`);
       }
 
-      if (!business) {
+      if (!data || !data.business_id) {
         throw new Error('لم يتم إرجاع معرف المتجر');
       }
 
-      console.log('Business created:', business.id);
-
-      const { error: memberError } = await supabase
-        .from('business_members')
-        .insert({
-          business_id: business.id,
-          user_id: user.id,
-          role: 'admin',
-          status: 'active',
-        });
-
-      if (memberError) {
-        console.error('Error creating business member:', memberError);
-        throw new Error(`فشل ربط المستخدم بالمتجر: ${memberError.message}`);
-      }
-
-      console.log('Business member created');
-
-      const trialEndsAt = new Date();
-      trialEndsAt.setHours(trialEndsAt.getHours() + 24);
-
-      const { error: billingError } = await supabase
-        .from('business_billing')
-        .insert({
-          business_id: business.id,
-          plan: 'starter',
-          status: 'trial',
-          is_trial: true,
-          trial_ends_at: trialEndsAt.toISOString(),
-          created_by: user.id,
-        });
-
-      if (billingError) {
-        console.error('Error creating billing:', billingError);
-        throw new Error(`فشل إنشاء الفوترة: ${billingError.message}`);
-      }
-
-      console.log('Billing created successfully');
+      console.log('Workspace created successfully:', data);
 
       setSuccess(true);
 
-      localStorage.setItem('currentBusinessId', business.id);
+      localStorage.setItem('currentBusinessId', data.business_id);
 
       await checkWorkspaceStatus();
       await refreshBusinesses();
