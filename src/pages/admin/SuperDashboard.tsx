@@ -296,8 +296,7 @@ export default function SuperDashboard() {
     const query = searchQuery.toLowerCase();
     return workspaces.filter(w =>
       w.name.toLowerCase().includes(query) ||
-      (w.owner_email && w.owner_email.toLowerCase().includes(query)) ||
-      w.slug?.toLowerCase().includes(query)
+      (w.owner_email && w.owner_email.toLowerCase().includes(query))
     );
   }, [workspaces, searchQuery]);
 
