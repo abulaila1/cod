@@ -8,6 +8,7 @@ import type {
   CountryBreakdown,
   CarrierBreakdown,
   EmployeeBreakdown,
+  ProductBreakdown,
   OrderMetrics,
 } from './types';
 
@@ -85,17 +86,18 @@ export class MetricsService {
     businessId: string,
     filters: MetricsFilters
   ): Promise<Breakdowns> {
-    const [byCountry, byCarrier, byEmployee] = await Promise.all([
+    const [byCountry, byCarrier, byEmployee, byProduct] = await Promise.all([
       this.getCountryBreakdown(businessId, filters),
       this.getCarrierBreakdown(businessId, filters),
       this.getEmployeeBreakdown(businessId, filters),
+      this.getProductBreakdown(businessId, filters),
     ]);
 
     return {
       by_country: byCountry,
       by_carrier: byCarrier,
       by_employee: byEmployee,
-      by_product: [],
+      by_product: byProduct,
     };
   }
 
@@ -220,6 +222,151 @@ export class MetricsService {
     }
 
     return breakdown.sort((a, b) => b.total - a.total);
+  }
+
+  private static async getProductBreakdown(
+    businessId: string,
+    filters: MetricsFilters
+  ): Promise<ProductBreakdown[]> {
+    let query = supabase
+      .from('order_items')
+      .select(`
+        id,
+        product_id,
+        qty,
+        item_price,
+        item_cogs,
+        products!inner(name_ar),
+        orders!inner(
+          order_date,
+          status_id,
+          statuses!inner(
+            counts_as_delivered,
+            counts_as_return
+          )
+        )
+      `)
+      .eq('business_id', businessId)
+      .gte('orders.order_date', filters.date_from)
+      .lte('orders.order_date', filters.date_to);
+
+    const { data, error } = await query;
+
+    if (error) throw error;
+
+    const groupedByProduct = new Map<string, {
+      name: string;
+      items: Array<{
+        qty: number;
+        revenue: number;
+        cogs: number;
+        delivered: boolean;
+        returned: boolean;
+      }>;
+    }>();
+
+    for (const item of data || []) {
+      const productId = item.product_id;
+      if (!groupedByProduct.has(productId)) {
+        groupedByProduct.set(productId, {
+          name: item.products.name_ar,
+          items: [],
+        });
+      }
+
+      groupedByProduct.get(productId)!.items.push({
+        qty: item.qty,
+        revenue: item.item_price * item.qty,
+        cogs: item.item_cogs * item.qty,
+        delivered: item.orders.statuses.counts_as_delivered,
+        returned: item.orders.statuses.counts_as_return,
+      });
+    }
+
+    const breakdown: ProductBreakdown[] = [];
+
+    for (const [productId, { name, items }] of groupedByProduct.entries()) {
+      const totalItems = items.reduce((sum, i) => sum + i.qty, 0);
+      const totalOrders = items.length;
+      const delivered = items.filter(i => i.delivered).length;
+      const returns = items.filter(i => i.returned).length;
+      const revenue = items.reduce((sum, i) => sum + i.revenue, 0);
+      const totalCogs = items.reduce((sum, i) => sum + i.cogs, 0);
+      const profit = revenue - totalCogs;
+
+      breakdown.push({
+        product_id: productId,
+        name_ar: name,
+        total_items: totalItems,
+        total_orders: totalOrders,
+        delivered,
+        returns,
+        revenue,
+        profit,
+        delivery_rate: totalOrders > 0 ? (delivered / totalOrders) * 100 : 0,
+      });
+    }
+
+    return breakdown.sort((a, b) => b.profit - a.profit);
+  }
+
+  static async getStatusDistribution(
+    businessId: string,
+    filters: MetricsFilters
+  ): Promise<Array<{ status_key: string; label_ar: string; count: number; percentage: number }>> {
+    let query = supabase
+      .from('orders')
+      .select(`
+        status_id,
+        statuses!inner(key, label_ar)
+      `)
+      .eq('business_id', businessId)
+      .gte('order_date', filters.date_from)
+      .lte('order_date', filters.date_to);
+
+    if (filters.country_id) {
+      query = query.eq('country_id', filters.country_id);
+    }
+
+    if (filters.carrier_id) {
+      query = query.eq('carrier_id', filters.carrier_id);
+    }
+
+    if (filters.employee_id) {
+      query = query.eq('employee_id', filters.employee_id);
+    }
+
+    const { data, error } = await query;
+
+    if (error) throw error;
+
+    const statusCounts = new Map<string, { key: string; label: string; count: number }>();
+
+    for (const order of data || []) {
+      const statusKey = order.statuses.key;
+      const statusLabel = order.statuses.label_ar;
+
+      if (!statusCounts.has(statusKey)) {
+        statusCounts.set(statusKey, {
+          key: statusKey,
+          label: statusLabel,
+          count: 0,
+        });
+      }
+
+      statusCounts.get(statusKey)!.count++;
+    }
+
+    const total = data?.length || 0;
+
+    return Array.from(statusCounts.values())
+      .map(({ key, label, count }) => ({
+        status_key: key,
+        label_ar: label,
+        count,
+        percentage: total > 0 ? (count / total) * 100 : 0,
+      }))
+      .sort((a, b) => b.count - a.count);
   }
 
   private static async fetchOrdersWithMetrics(

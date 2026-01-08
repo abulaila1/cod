@@ -1,25 +1,49 @@
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, Button, Select, DateRangePicker } from '@/components/ui';
-import { SkeletonCard } from '@/components/common/Skeleton';
-import { useBusiness } from '@/contexts/BusinessContext';
-import { MetricsService, type MetricsFilters, type KPIs } from '@/domain/metrics';
-import { EntitiesService } from '@/services';
-import type { Country, Carrier, Employee } from '@/types/domain';
 import {
-  ShoppingCart,
-  CheckCircle,
-  Clock,
-  XCircle,
+  AreaChart,
+  Area,
+  PieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+} from 'recharts';
+import clsx from 'clsx';
+import { Card, DateRangePicker, Select } from '@/components/ui';
+import { useBusiness } from '@/contexts/BusinessContext';
+import { MetricsService, type MetricsFilters, type KPIs, type TimeSeriesDataPoint } from '@/domain/metrics';
+import { EntitiesService } from '@/services';
+import type { Country, Carrier, Employee, ProductBreakdown, CountryBreakdown } from '@/types/domain';
+import {
   TrendingUp,
   TrendingDown,
   DollarSign,
-  CreditCard,
+  CheckCircle,
+  ShoppingCart,
+  AlertTriangle,
+  Calendar,
 } from 'lucide-react';
+
+const STATUS_COLORS: Record<string, string> = {
+  delivered: '#10b981',
+  pending: '#f59e0b',
+  canceled: '#ef4444',
+  rto: '#dc2626',
+  out_for_delivery: '#3b82f6',
+  default: '#6b7280',
+};
 
 export function Dashboard() {
   const { currentBusiness } = useBusiness();
   const [isLoading, setIsLoading] = useState(true);
   const [kpis, setKpis] = useState<KPIs | null>(null);
+  const [timeSeries, setTimeSeries] = useState<TimeSeriesDataPoint[]>([]);
+  const [statusDistribution, setStatusDistribution] = useState<any[]>([]);
+  const [topProducts, setTopProducts] = useState<ProductBreakdown[]>([]);
+  const [topCountries, setTopCountries] = useState<CountryBreakdown[]>([]);
 
   const [countries, setCountries] = useState<Country[]>([]);
   const [carriers, setCarriers] = useState<Carrier[]>([]);
@@ -53,10 +77,20 @@ export function Dashboard() {
 
     try {
       setIsLoading(true);
-      const data = await MetricsService.getKpis(currentBusiness.id, filters);
-      setKpis(data);
+      const [kpisData, timeSeriesData, statusData, breakdowns] = await Promise.all([
+        MetricsService.getKpis(currentBusiness.id, filters),
+        MetricsService.getTimeSeries(currentBusiness.id, filters),
+        MetricsService.getStatusDistribution(currentBusiness.id, filters),
+        MetricsService.getBreakdowns(currentBusiness.id, filters),
+      ]);
+
+      setKpis(kpisData);
+      setTimeSeries(timeSeriesData);
+      setStatusDistribution(statusData);
+      setTopProducts(breakdowns.by_product.slice(0, 5));
+      setTopCountries(breakdowns.by_country.slice(0, 5));
     } catch (error) {
-      console.error('Failed to load KPIs:', error);
+      console.error('Failed to load dashboard data:', error);
     } finally {
       setIsLoading(false);
     }
@@ -80,10 +114,6 @@ export function Dashboard() {
     }
   };
 
-  const formatNumber = (num: number): string => {
-    return new Intl.NumberFormat('ar-EG').format(Math.round(num));
-  };
-
   const formatCurrency = (num: number): string => {
     return new Intl.NumberFormat('ar-EG', {
       style: 'decimal',
@@ -92,8 +122,27 @@ export function Dashboard() {
     }).format(num);
   };
 
-  const formatPercentage = (num: number): string => {
-    return `${num.toFixed(1)}%`;
+  const formatNumber = (num: number): string => {
+    return new Intl.NumberFormat('ar-EG').format(Math.round(num));
+  };
+
+  const setQuickDateRange = (range: 'today' | 'week' | 'month') => {
+    const end = new Date().toISOString().split('T')[0];
+    let start: string;
+
+    if (range === 'today') {
+      start = end;
+    } else if (range === 'week') {
+      const d = new Date();
+      d.setDate(d.getDate() - 7);
+      start = d.toISOString().split('T')[0];
+    } else {
+      const d = new Date();
+      d.setMonth(d.getMonth() - 1);
+      start = d.toISOString().split('T')[0];
+    }
+
+    setFilters({ ...filters, date_from: start, date_to: end });
   };
 
   if (!currentBusiness) {
@@ -104,41 +153,59 @@ export function Dashboard() {
     );
   }
 
+  const deliveryRateColor = kpis && kpis.delivery_rate >= 70 ? 'text-emerald-600' : 'text-amber-600';
+  const returnRateColor = kpis && kpis.return_rate <= 20 ? 'text-emerald-600' : 'text-rose-600';
+
   return (
-    <>
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-zinc-950 mb-2">لوحة التحكم</h1>
-        <p className="text-zinc-600">نظرة شاملة على أداء عملك</p>
+    <div className="space-y-6">
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-zinc-950 mb-1">لوحة التحكم</h1>
+          <p className="text-sm text-zinc-600">نظرة شاملة على أداء عملك</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setQuickDateRange('today')}
+            className="px-3 py-1.5 text-sm font-medium text-zinc-700 bg-white border border-zinc-300 rounded-lg hover:bg-zinc-50 transition-colors"
+          >
+            اليوم
+          </button>
+          <button
+            onClick={() => setQuickDateRange('week')}
+            className="px-3 py-1.5 text-sm font-medium text-zinc-700 bg-white border border-zinc-300 rounded-lg hover:bg-zinc-50 transition-colors"
+          >
+            آخر 7 أيام
+          </button>
+          <button
+            onClick={() => setQuickDateRange('month')}
+            className="px-3 py-1.5 text-sm font-medium text-zinc-700 bg-white border border-zinc-300 rounded-lg hover:bg-zinc-50 transition-colors"
+          >
+            آخر 30 يوم
+          </button>
+        </div>
       </div>
 
-      <Card className="mb-6">
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <Card className="bg-gradient-to-br from-slate-50 to-zinc-50 border-zinc-200">
+        <div className="p-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
-              <label className="block text-sm font-medium text-zinc-700 mb-2">
+              <label className="block text-xs font-medium text-zinc-700 mb-1.5">
                 الفترة الزمنية
               </label>
               <DateRangePicker
                 startDate={filters.date_from}
                 endDate={filters.date_to}
-                onStartDateChange={(date) =>
-                  setFilters({ ...filters, date_from: date })
-                }
+                onStartDateChange={(date) => setFilters({ ...filters, date_from: date })}
                 onEndDateChange={(date) => setFilters({ ...filters, date_to: date })}
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-zinc-700 mb-2">
-                الدولة
-              </label>
+              <label className="block text-xs font-medium text-zinc-700 mb-1.5">الدولة</label>
               <Select
                 value={filters.country_id || ''}
                 onChange={(e) =>
-                  setFilters({
-                    ...filters,
-                    country_id: e.target.value || undefined,
-                  })
+                  setFilters({ ...filters, country_id: e.target.value || undefined })
                 }
               >
                 <option value="">الكل</option>
@@ -151,16 +218,13 @@ export function Dashboard() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-zinc-700 mb-2">
+              <label className="block text-xs font-medium text-zinc-700 mb-1.5">
                 شركة الشحن
               </label>
               <Select
                 value={filters.carrier_id || ''}
                 onChange={(e) =>
-                  setFilters({
-                    ...filters,
-                    carrier_id: e.target.value || undefined,
-                  })
+                  setFilters({ ...filters, carrier_id: e.target.value || undefined })
                 }
               >
                 <option value="">الكل</option>
@@ -173,16 +237,11 @@ export function Dashboard() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-zinc-700 mb-2">
-                الموظف
-              </label>
+              <label className="block text-xs font-medium text-zinc-700 mb-1.5">الموظف</label>
               <Select
                 value={filters.employee_id || ''}
                 onChange={(e) =>
-                  setFilters({
-                    ...filters,
-                    employee_id: e.target.value || undefined,
-                  })
+                  setFilters({ ...filters, employee_id: e.target.value || undefined })
                 }
               >
                 <option value="">الكل</option>
@@ -194,19 +253,19 @@ export function Dashboard() {
               </Select>
             </div>
           </div>
-        </CardContent>
+        </div>
       </Card>
 
       {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <SkeletonCard />
-          <SkeletonCard />
-          <SkeletonCard />
-          <SkeletonCard />
-          <SkeletonCard />
-          <SkeletonCard />
-          <SkeletonCard />
-          <SkeletonCard />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <Card key={i} className="animate-pulse">
+              <div className="p-6">
+                <div className="h-4 bg-zinc-200 rounded w-24 mb-3"></div>
+                <div className="h-8 bg-zinc-200 rounded w-32"></div>
+              </div>
+            </Card>
+          ))}
         </div>
       ) : !kpis ? (
         <div className="text-center py-12">
@@ -214,165 +273,315 @@ export function Dashboard() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <Card hover>
-              <CardContent className="flex flex-col gap-4">
-                <div className="flex items-center justify-between">
-                  <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center">
-                    <ShoppingCart className="h-6 w-6 text-blue-600" />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card className="bg-gradient-to-br from-emerald-50 to-green-50 border-emerald-200 shadow-sm hover:shadow-md transition-shadow">
+              <div className="p-6">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="p-2.5 bg-emerald-100 rounded-xl">
+                    <DollarSign className="h-5 w-5 text-emerald-700" />
                   </div>
+                  <TrendingUp className="h-4 w-4 text-emerald-600" />
                 </div>
-                <div>
-                  <p className="text-sm text-zinc-500 mb-1">إجمالي الطلبات</p>
-                  <p className="text-3xl font-bold text-zinc-950">
-                    {formatNumber(kpis.total_orders)}
-                  </p>
-                </div>
-              </CardContent>
+                <p className="text-xs font-medium text-emerald-900 mb-1">صافي الربح</p>
+                <p className="text-2xl font-bold text-emerald-950">
+                  {formatCurrency(kpis.net_profit)} <span className="text-sm font-normal">ج.م</span>
+                </p>
+              </div>
             </Card>
 
-            <Card hover>
-              <CardContent className="flex flex-col gap-4">
-                <div className="flex items-center justify-between">
-                  <div className="w-12 h-12 rounded-xl bg-emerald-100 flex items-center justify-center">
-                    <CheckCircle className="h-6 w-6 text-emerald-600" />
+            <Card className="bg-gradient-to-br from-blue-50 to-sky-50 border-blue-200 shadow-sm hover:shadow-md transition-shadow">
+              <div className="p-6">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="p-2.5 bg-blue-100 rounded-xl">
+                    <CheckCircle className="h-5 w-5 text-blue-700" />
+                  </div>
+                  <div className={clsx('flex items-center gap-1', deliveryRateColor)}>
+                    <span className="text-xs font-semibold">{kpis.delivery_rate.toFixed(1)}%</span>
                   </div>
                 </div>
-                <div>
-                  <p className="text-sm text-zinc-500 mb-1">تم التوصيل</p>
-                  <p className="text-3xl font-bold text-zinc-950">
-                    {formatNumber(kpis.delivered_orders)}
-                  </p>
-                </div>
-              </CardContent>
+                <p className="text-xs font-medium text-blue-900 mb-1">نسبة التسليم</p>
+                <p className="text-2xl font-bold text-blue-950">
+                  {formatNumber(kpis.delivered_orders)} <span className="text-sm font-normal">طلب</span>
+                </p>
+              </div>
             </Card>
 
-            <Card hover>
-              <CardContent className="flex flex-col gap-4">
-                <div className="flex items-center justify-between">
-                  <div className="w-12 h-12 rounded-xl bg-amber-100 flex items-center justify-center">
-                    <Clock className="h-6 w-6 text-amber-600" />
+            <Card className="bg-gradient-to-br from-violet-50 to-purple-50 border-violet-200 shadow-sm hover:shadow-md transition-shadow">
+              <div className="p-6">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="p-2.5 bg-violet-100 rounded-xl">
+                    <ShoppingCart className="h-5 w-5 text-violet-700" />
                   </div>
+                  <Calendar className="h-4 w-4 text-violet-600" />
                 </div>
-                <div>
-                  <p className="text-sm text-zinc-500 mb-1">قيد التنفيذ</p>
-                  <p className="text-3xl font-bold text-zinc-950">
-                    {formatNumber(kpis.active_orders)}
-                  </p>
-                </div>
-              </CardContent>
+                <p className="text-xs font-medium text-violet-900 mb-1">إجمالي الطلبات</p>
+                <p className="text-2xl font-bold text-violet-950">{formatNumber(kpis.total_orders)}</p>
+              </div>
             </Card>
 
-            <Card hover>
-              <CardContent className="flex flex-col gap-4">
-                <div className="flex items-center justify-between">
-                  <div className="w-12 h-12 rounded-xl bg-red-100 flex items-center justify-center">
-                    <XCircle className="h-6 w-6 text-red-600" />
+            <Card className="bg-gradient-to-br from-rose-50 to-red-50 border-rose-200 shadow-sm hover:shadow-md transition-shadow">
+              <div className="p-6">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="p-2.5 bg-rose-100 rounded-xl">
+                    <AlertTriangle className="h-5 w-5 text-rose-700" />
+                  </div>
+                  <div className={clsx('flex items-center gap-1', returnRateColor)}>
+                    <span className="text-xs font-semibold">{kpis.return_rate.toFixed(1)}%</span>
                   </div>
                 </div>
-                <div>
-                  <p className="text-sm text-zinc-500 mb-1">المرتجع</p>
-                  <p className="text-3xl font-bold text-zinc-950">
-                    {formatNumber(kpis.return_orders)}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card hover>
-              <CardContent className="flex flex-col gap-4">
-                <div className="flex items-center justify-between">
-                  <div className="w-12 h-12 rounded-xl bg-emerald-100 flex items-center justify-center">
-                    <TrendingUp className="h-6 w-6 text-emerald-600" />
-                  </div>
-                </div>
-                <div>
-                  <p className="text-sm text-zinc-500 mb-1">نسبة التسليم</p>
-                  <p className="text-3xl font-bold text-zinc-950">
-                    {formatPercentage(kpis.delivery_rate)}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card hover>
-              <CardContent className="flex flex-col gap-4">
-                <div className="flex items-center justify-between">
-                  <div className="w-12 h-12 rounded-xl bg-red-100 flex items-center justify-center">
-                    <TrendingDown className="h-6 w-6 text-red-600" />
-                  </div>
-                </div>
-                <div>
-                  <p className="text-sm text-zinc-500 mb-1">نسبة المرتجع</p>
-                  <p className="text-3xl font-bold text-zinc-950">
-                    {formatPercentage(kpis.return_rate)}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card hover>
-              <CardContent className="flex flex-col gap-4">
-                <div className="flex items-center justify-between">
-                  <div className="w-12 h-12 rounded-xl bg-green-100 flex items-center justify-center">
-                    <DollarSign className="h-6 w-6 text-green-600" />
-                  </div>
-                </div>
-                <div>
-                  <p className="text-sm text-zinc-500 mb-1">صافي الربح</p>
-                  <p className="text-3xl font-bold text-zinc-950">
-                    {formatCurrency(kpis.net_profit)} ج.م
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card hover>
-              <CardContent className="flex flex-col gap-4">
-                <div className="flex items-center justify-between">
-                  <div className="w-12 h-12 rounded-xl bg-sky-100 flex items-center justify-center">
-                    <CreditCard className="h-6 w-6 text-sky-600" />
-                  </div>
-                </div>
-                <div>
-                  <p className="text-sm text-zinc-500 mb-1">متوسط قيمة الطلب</p>
-                  <p className="text-3xl font-bold text-zinc-950">
-                    {formatCurrency(kpis.aov)} ج.م
-                  </p>
-                </div>
-              </CardContent>
+                <p className="text-xs font-medium text-rose-900 mb-1">نسبة المرتجع</p>
+                <p className="text-2xl font-bold text-rose-950">
+                  {formatNumber(kpis.return_orders)} <span className="text-sm font-normal">طلب</span>
+                </p>
+              </div>
             </Card>
           </div>
 
-          <Card>
-            <CardHeader>
-              <h3 className="text-lg font-bold text-zinc-950">ملخص الأداء</h3>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div>
-                  <p className="text-sm text-zinc-500 mb-1">إجمالي المبيعات</p>
-                  <p className="text-2xl font-bold text-zinc-950">
-                    {formatCurrency(kpis.gross_sales)} ج.م
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-zinc-500 mb-1">تكلفة البضاعة</p>
-                  <p className="text-2xl font-bold text-zinc-950">
-                    {formatCurrency(kpis.total_cogs)} ج.م
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-zinc-500 mb-1">تكلفة الشحن</p>
-                  <p className="text-2xl font-bold text-zinc-950">
-                    {formatCurrency(kpis.total_shipping_cost)} ج.م
-                  </p>
-                </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <Card className="lg:col-span-2 shadow-sm">
+              <div className="p-5 border-b border-zinc-200">
+                <h3 className="text-sm font-bold text-zinc-950">المبيعات والأرباح</h3>
+                <p className="text-xs text-zinc-500 mt-0.5">تطور الإيرادات والربح الصافي</p>
               </div>
-            </CardContent>
-          </Card>
+              <div className="p-5">
+                <ResponsiveContainer width="100%" height={280}>
+                  <AreaChart data={timeSeries}>
+                    <defs>
+                      <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                      </linearGradient>
+                      <linearGradient id="colorProfit" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <XAxis
+                      dataKey="date"
+                      stroke="#6b7280"
+                      fontSize={11}
+                      tickFormatter={(date) => {
+                        const d = new Date(date);
+                        return `${d.getDate()}/${d.getMonth() + 1}`;
+                      }}
+                    />
+                    <YAxis stroke="#6b7280" fontSize={11} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: '#ffffff',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '8px',
+                        fontSize: '12px',
+                      }}
+                      formatter={(value: number) => formatCurrency(value)}
+                      labelFormatter={(date) => new Date(date).toLocaleDateString('ar-EG')}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="gross_sales"
+                      stroke="#3b82f6"
+                      strokeWidth={2}
+                      fillOpacity={1}
+                      fill="url(#colorRevenue)"
+                      name="المبيعات"
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="net_profit"
+                      stroke="#10b981"
+                      strokeWidth={2}
+                      fillOpacity={1}
+                      fill="url(#colorProfit)"
+                      name="الربح الصافي"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </Card>
+
+            <Card className="shadow-sm">
+              <div className="p-5 border-b border-zinc-200">
+                <h3 className="text-sm font-bold text-zinc-950">توزيع حالات الطلبات</h3>
+                <p className="text-xs text-zinc-500 mt-0.5">نسبة الطلبات حسب الحالة</p>
+              </div>
+              <div className="p-5">
+                {statusDistribution.length > 0 ? (
+                  <>
+                    <ResponsiveContainer width="100%" height={200}>
+                      <PieChart>
+                        <Pie
+                          data={statusDistribution}
+                          dataKey="count"
+                          nameKey="label_ar"
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={50}
+                          outerRadius={80}
+                          paddingAngle={2}
+                        >
+                          {statusDistribution.map((entry, index) => (
+                            <Cell
+                              key={`cell-${index}`}
+                              fill={STATUS_COLORS[entry.status_key] || STATUS_COLORS.default}
+                            />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: '#ffffff',
+                            border: '1px solid #e5e7eb',
+                            borderRadius: '8px',
+                            fontSize: '12px',
+                          }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <div className="mt-4 space-y-2">
+                      {statusDistribution.map((status) => (
+                        <div key={status.status_key} className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div
+                              className="w-3 h-3 rounded-full"
+                              style={{
+                                backgroundColor:
+                                  STATUS_COLORS[status.status_key] || STATUS_COLORS.default,
+                              }}
+                            />
+                            <span className="text-xs text-zinc-700">{status.label_ar}</span>
+                          </div>
+                          <span className="text-xs font-semibold text-zinc-950">
+                            {status.percentage.toFixed(1)}%
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <div className="h-60 flex items-center justify-center text-sm text-zinc-500">
+                    لا توجد بيانات لعرضها
+                  </div>
+                )}
+              </div>
+            </Card>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <Card className="shadow-sm">
+              <div className="p-5 border-b border-zinc-200">
+                <h3 className="text-sm font-bold text-zinc-950">أفضل المنتجات</h3>
+                <p className="text-xs text-zinc-500 mt-0.5">المنتجات الأكثر ربحية</p>
+              </div>
+              <div className="p-5">
+                {topProducts.length > 0 ? (
+                  <div className="space-y-3">
+                    {topProducts.map((product) => (
+                      <div
+                        key={product.product_id}
+                        className="flex items-center justify-between p-3 bg-zinc-50 rounded-lg hover:bg-zinc-100 transition-colors"
+                      >
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-zinc-950">
+                            {product.name_ar}
+                          </p>
+                          <p className="text-xs text-zinc-500 mt-0.5">
+                            {formatNumber(product.total_items)} قطعة • {formatNumber(product.total_orders)} طلب
+                          </p>
+                        </div>
+                        <div className="text-left">
+                          <p className="text-sm font-bold text-emerald-700">
+                            {formatCurrency(product.profit)} ج.م
+                          </p>
+                          <p className="text-xs text-zinc-500 mt-0.5">
+                            {product.delivery_rate.toFixed(0)}% تسليم
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="h-40 flex items-center justify-center text-sm text-zinc-500">
+                    لا توجد بيانات
+                  </div>
+                )}
+              </div>
+            </Card>
+
+            <Card className="shadow-sm">
+              <div className="p-5 border-b border-zinc-200">
+                <h3 className="text-sm font-bold text-zinc-950">أفضل المحافظات</h3>
+                <p className="text-xs text-zinc-500 mt-0.5">المحافظات الأعلى في التسليم</p>
+              </div>
+              <div className="p-5">
+                {topCountries.length > 0 ? (
+                  <div className="space-y-3">
+                    {topCountries.map((country) => (
+                      <div key={country.country_id} className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium text-zinc-950">
+                            {country.name_ar}
+                          </span>
+                          <span className="text-sm font-bold text-zinc-950">
+                            {country.delivery_rate.toFixed(1)}%
+                          </span>
+                        </div>
+                        <div className="relative h-2 bg-zinc-200 rounded-full overflow-hidden">
+                          <div
+                            className={clsx(
+                              'absolute top-0 right-0 h-full rounded-full transition-all',
+                              country.delivery_rate >= 70
+                                ? 'bg-emerald-500'
+                                : country.delivery_rate >= 50
+                                ? 'bg-amber-500'
+                                : 'bg-rose-500'
+                            )}
+                            style={{ width: `${country.delivery_rate}%` }}
+                          />
+                        </div>
+                        <div className="flex items-center justify-between text-xs text-zinc-500">
+                          <span>{formatNumber(country.delivered)} / {formatNumber(country.total)} طلب</span>
+                          <span>{formatCurrency(country.net_profit)} ج.م</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="h-40 flex items-center justify-center text-sm text-zinc-500">
+                    لا توجد بيانات
+                  </div>
+                )}
+              </div>
+            </Card>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card className="bg-white shadow-sm">
+              <div className="p-5">
+                <p className="text-xs font-medium text-zinc-600 mb-2">إجمالي المبيعات</p>
+                <p className="text-xl font-bold text-zinc-950">
+                  {formatCurrency(kpis.gross_sales)} <span className="text-sm font-normal text-zinc-600">ج.م</span>
+                </p>
+              </div>
+            </Card>
+            <Card className="bg-white shadow-sm">
+              <div className="p-5">
+                <p className="text-xs font-medium text-zinc-600 mb-2">تكلفة البضاعة</p>
+                <p className="text-xl font-bold text-zinc-950">
+                  {formatCurrency(kpis.total_cogs)} <span className="text-sm font-normal text-zinc-600">ج.م</span>
+                </p>
+              </div>
+            </Card>
+            <Card className="bg-white shadow-sm">
+              <div className="p-5">
+                <p className="text-xs font-medium text-zinc-600 mb-2">تكلفة الشحن</p>
+                <p className="text-xl font-bold text-zinc-950">
+                  {formatCurrency(kpis.total_shipping_cost)} <span className="text-sm font-normal text-zinc-600">ج.م</span>
+                </p>
+              </div>
+            </Card>
+          </div>
         </>
       )}
-    </>
+    </div>
   );
 }

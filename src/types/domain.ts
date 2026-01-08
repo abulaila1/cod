@@ -156,3 +156,25 @@ export interface AuditLogWithUser extends AuditLog {
     email: string;
   };
 }
+
+export interface ProductBreakdown {
+  product_id: string;
+  name_ar: string;
+  total_items: number;
+  total_orders: number;
+  delivered: number;
+  returns: number;
+  revenue: number;
+  profit: number;
+  delivery_rate: number;
+}
+
+export interface CountryBreakdown {
+  country_id: string;
+  name_ar: string;
+  total: number;
+  delivered: number;
+  returns: number;
+  delivery_rate: number;
+  net_profit: number;
+}
