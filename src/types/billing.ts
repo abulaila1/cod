@@ -26,6 +26,7 @@ export interface PlanDetails {
   limit: number | null;
   features: string[];
   featuresAr: string[];
+  stripeLink: string;
   recommended?: boolean;
   popular?: boolean;
 }
@@ -48,6 +49,7 @@ export const PLAN_CONFIG: Record<PlanType, Omit<PlanDetails, 'key'>> = {
       'دعم عبر البريد',
       'وصول مدى الحياة'
     ],
+    stripeLink: 'https://buy.stripe.com/test_starter_plan',
   },
   pro: {
     name: 'Pro',
@@ -66,6 +68,7 @@ export const PLAN_CONFIG: Record<PlanType, Omit<PlanDetails, 'key'>> = {
       'دعم ذو أولوية',
       'وصول مدى الحياة'
     ],
+    stripeLink: 'https://buy.stripe.com/test_pro_plan',
     recommended: true,
     popular: true,
   },
@@ -86,6 +89,7 @@ export const PLAN_CONFIG: Record<PlanType, Omit<PlanDetails, 'key'>> = {
       'دعم على مدار الساعة',
       'وصول مدى الحياة'
     ],
+    stripeLink: 'https://buy.stripe.com/test_elite_plan',
   },
   enterprise: {
     name: 'Enterprise',
@@ -104,12 +108,15 @@ export const PLAN_CONFIG: Record<PlanType, Omit<PlanDetails, 'key'>> = {
       'مدير حساب مخصص',
       'وصول مدى الحياة'
     ],
+    stripeLink: 'https://buy.stripe.com/test_enterprise_plan',
   },
 };
 
-export const WHATSAPP_NUMBER = '+966500000000';
+export const WHATSAPP_NUMBER = '966500000000';
 export const BANK_DETAILS = {
   bankName: 'Al Rajhi Bank',
+  bankNameAr: 'مصرف الراجحي',
   accountName: 'Company Name',
+  accountNumber: '1234567890',
   iban: 'SA0000000000000000000000',
 };

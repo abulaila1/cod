@@ -17,12 +17,14 @@ import {
   MessageCircle,
   Copy,
   CheckCircle,
-  X,
   Percent,
+  ExternalLink,
+  Banknote,
+  ArrowRight,
 } from 'lucide-react';
 import type { Billing, PlanType, PlanDetails } from '@/types/billing';
 import type { UsageStatus } from '@/services/usage.service';
-import { PLAN_CONFIG, WHATSAPP_NUMBER, BANK_DETAILS } from '@/types/billing';
+import { PLAN_CONFIG, BANK_DETAILS } from '@/types/billing';
 
 const PLANS: PlanDetails[] = [
   { key: 'starter', ...PLAN_CONFIG.starter },
@@ -55,7 +57,7 @@ export function Billing() {
   const [hasDiscount, setHasDiscount] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
 
-  const [isManualPaymentModalOpen, setIsManualPaymentModalOpen] = useState(false);
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<PlanDetails | null>(null);
   const [receiptRef, setReceiptRef] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -117,29 +119,42 @@ export function Billing() {
     setTimeout(() => setCopiedField(null), 2000);
   };
 
-  const handleOpenManualPayment = (plan: PlanDetails) => {
+  const openPaymentModal = (plan: PlanDetails) => {
     setSelectedPlan(plan);
     setReceiptRef('');
     setPaymentSuccess(false);
-    setIsManualPaymentModalOpen(true);
+    setIsPaymentModalOpen(true);
+  };
+
+  const handleStripePayment = () => {
+    if (!selectedPlan) return;
+    window.open(selectedPlan.stripeLink, '_blank');
+  };
+
+  const handleWhatsAppClick = () => {
+    if (!selectedPlan || !currentBusiness) return;
+    const finalPrice = hasDiscount
+      ? BillingService.getDiscountedPrice(selectedPlan.price)
+      : selectedPlan.price;
+    const link = BillingService.generateWhatsAppLink(
+      selectedPlan.nameAr,
+      finalPrice,
+      currentBusiness.name,
+      receiptRef || undefined
+    );
+    window.open(link, '_blank');
   };
 
   const handleSubmitManualPayment = async () => {
-    if (!currentBusiness || !selectedPlan || !receiptRef.trim()) return;
+    if (!currentBusiness || !selectedPlan) return;
 
     try {
       setIsProcessing(true);
-      const finalPrice = hasDiscount
-        ? BillingService.getDiscountedPrice(selectedPlan.price)
-        : selectedPlan.price;
-
       await BillingService.submitManualPayment(
         currentBusiness.id,
         selectedPlan.key,
-        finalPrice,
-        receiptRef.trim()
+        receiptRef.trim() || undefined
       );
-
       setPaymentSuccess(true);
       await loadBillingData();
     } catch (error) {
@@ -147,22 +162,6 @@ export function Billing() {
     } finally {
       setIsProcessing(false);
     }
-  };
-
-  const handleWhatsAppClick = () => {
-    if (!selectedPlan || !currentBusiness) return;
-
-    const finalPrice = hasDiscount
-      ? BillingService.getDiscountedPrice(selectedPlan.price)
-      : selectedPlan.price;
-
-    const message = BillingService.formatWhatsAppMessage(
-      selectedPlan.nameAr,
-      finalPrice,
-      currentBusiness.name
-    );
-
-    window.open(`https://wa.me/${WHATSAPP_NUMBER.replace('+', '')}?text=${message}`, '_blank');
   };
 
   const getPrice = (plan: PlanDetails): { original: number; final: number } => {
@@ -190,7 +189,7 @@ export function Billing() {
 
   const isTrialActive = billing && BillingService.isTrialActive(billing);
   const isTrialExpired = billing && BillingService.isTrialExpired(billing);
-  const isPendingPayment = currentBusiness && (currentBusiness as any).manual_payment_status === 'pending';
+  const isPendingPayment = (currentBusiness as any)?.manual_payment_status === 'pending';
 
   return (
     <div className="max-w-6xl mx-auto">
@@ -223,14 +222,26 @@ export function Billing() {
 
       {isTrialExpired && !isPendingPayment && (
         <div className="mb-8 bg-gradient-to-r from-red-500 to-rose-500 rounded-2xl p-6 text-white shadow-lg">
-          <div className="flex items-center gap-4">
-            <div className="bg-white/20 p-3 rounded-xl">
-              <AlertTriangle className="h-8 w-8" />
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <div className="flex items-center gap-4">
+              <div className="bg-white/20 p-3 rounded-xl">
+                <AlertTriangle className="h-8 w-8" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold">انتهت التجربة المجانية</h3>
+                <p className="text-white/90">اشترك الآن للاستمرار في استخدام النظام</p>
+              </div>
             </div>
-            <div className="flex-1">
-              <h3 className="text-xl font-bold">انتهت التجربة المجانية</h3>
-              <p className="text-white/90">اشترك الآن للاستمرار في استخدام النظام</p>
-            </div>
+            {canManage && (
+              <Button
+                variant="outline"
+                className="bg-white text-red-600 border-white hover:bg-red-50"
+                onClick={() => openPaymentModal(PLANS.find(p => p.popular) || PLANS[0])}
+              >
+                اشترك الآن
+                <ArrowRight className="h-4 w-4 mr-2" />
+              </Button>
+            )}
           </div>
         </div>
       )}
@@ -273,7 +284,7 @@ export function Billing() {
             <Card
               key={plan.key}
               className={`relative overflow-hidden transition-all duration-300 hover:shadow-xl ${
-                isPro ? 'ring-2 ring-emerald-500 scale-105' : ''
+                isPro ? 'ring-2 ring-emerald-500 scale-[1.02]' : ''
               } ${isCurrentPlan ? 'bg-emerald-50' : ''}`}
             >
               {isPro && (
@@ -319,27 +330,17 @@ export function Billing() {
                 </div>
 
                 {canManage && !isCurrentPlan && (
-                  <div className="space-y-3">
-                    <Button
-                      variant="primary"
-                      className={`w-full ${
-                        isPro
-                          ? 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600'
-                          : ''
-                      }`}
-                      onClick={() => handleOpenManualPayment(plan)}
-                    >
-                      <CreditCard className="h-4 w-4 ml-2" />
-                      اشترك الآن
-                    </Button>
-                    <button
-                      onClick={() => handleOpenManualPayment(plan)}
-                      className="w-full text-sm text-zinc-500 hover:text-emerald-600 flex items-center justify-center gap-2 py-2"
-                    >
-                      <MessageCircle className="h-4 w-4" />
-                      تحويل بنكي / واتساب
-                    </button>
-                  </div>
+                  <Button
+                    variant="primary"
+                    className={`w-full ${
+                      isPro
+                        ? 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600'
+                        : ''
+                    }`}
+                    onClick={() => openPaymentModal(plan)}
+                  >
+                    اشترك الآن
+                  </Button>
                 )}
 
                 {isCurrentPlan && (
@@ -386,9 +387,9 @@ export function Billing() {
       )}
 
       <Modal
-        isOpen={isManualPaymentModalOpen}
-        onClose={() => setIsManualPaymentModalOpen(false)}
-        title={paymentSuccess ? 'تم إرسال طلب الاشتراك' : `الاشتراك في ${selectedPlan?.nameAr || ''}`}
+        isOpen={isPaymentModalOpen}
+        onClose={() => setIsPaymentModalOpen(false)}
+        title={paymentSuccess ? 'تم إرسال طلب الاشتراك' : `الترقية إلى خطة ${selectedPlan?.nameAr || ''}`}
       >
         {paymentSuccess ? (
           <div className="text-center py-8">
@@ -399,38 +400,81 @@ export function Billing() {
             <p className="text-zinc-600 mb-6">
               تم استلام طلبك وسيتم تفعيل حسابك خلال 24 ساعة بعد التحقق من الدفع.
             </p>
-            <Button variant="primary" onClick={() => setIsManualPaymentModalOpen(false)}>
+            <Button variant="primary" onClick={() => setIsPaymentModalOpen(false)}>
               حسناً
             </Button>
           </div>
         ) : (
           <div className="space-y-6">
             {selectedPlan && (
-              <div className="bg-zinc-50 rounded-xl p-4">
+              <div className="bg-gradient-to-r from-zinc-50 to-zinc-100 rounded-xl p-4 border border-zinc-200">
                 <div className="flex justify-between items-center mb-2">
-                  <span className="text-zinc-600">الخطة</span>
-                  <span className="font-semibold">{selectedPlan.nameAr}</span>
+                  <span className="text-zinc-600">الخطة المختارة</span>
+                  <span className="font-bold text-zinc-900">{selectedPlan.nameAr}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-zinc-600">المبلغ</span>
-                  <span className="text-2xl font-bold text-emerald-600">
-                    ${hasDiscount ? BillingService.getDiscountedPrice(selectedPlan.price) : selectedPlan.price}
-                  </span>
+                  <span className="text-zinc-600">المبلغ المطلوب</span>
+                  <div className="text-left">
+                    {hasDiscount && (
+                      <span className="text-zinc-400 line-through text-sm ml-2">
+                        ${selectedPlan.price}
+                      </span>
+                    )}
+                    <span className="text-2xl font-bold text-emerald-600">
+                      ${hasDiscount ? BillingService.getDiscountedPrice(selectedPlan.price) : selectedPlan.price}
+                    </span>
+                  </div>
                 </div>
               </div>
             )}
 
-            <div className="border-t border-zinc-200 pt-6">
-              <h4 className="font-semibold text-zinc-900 mb-4">بيانات التحويل البنكي</h4>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center p-3 bg-zinc-50 rounded-lg">
+            <div>
+              <h4 className="font-semibold text-zinc-900 mb-3 flex items-center gap-2">
+                <CreditCard className="h-5 w-5 text-blue-600" />
+                الدفع بالبطاقة (Stripe)
+              </h4>
+              <Button
+                variant="primary"
+                className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 py-4 text-lg"
+                onClick={handleStripePayment}
+              >
+                <CreditCard className="h-5 w-5 ml-2" />
+                ادفع بالبطاقة الائتمانية
+                <ExternalLink className="h-4 w-4 mr-2" />
+              </Button>
+              <p className="text-xs text-zinc-500 text-center mt-2">
+                دفع آمن ومشفر عبر Stripe - يتم التفعيل فوراً
+              </p>
+            </div>
+
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-zinc-200"></div>
+              </div>
+              <div className="relative flex justify-center">
+                <span className="bg-white px-4 text-sm text-zinc-500">أو</span>
+              </div>
+            </div>
+
+            <div>
+              <h4 className="font-semibold text-zinc-900 mb-3 flex items-center gap-2">
+                <Banknote className="h-5 w-5 text-emerald-600" />
+                الدفع عبر التحويل البنكي
+              </h4>
+
+              <div className="bg-zinc-50 rounded-xl p-4 mb-4 space-y-3">
+                <p className="text-sm text-zinc-600 mb-3">
+                  حوّل المبلغ إلى حسابنا البنكي، ثم أكد التحويل
+                </p>
+
+                <div className="flex justify-between items-center p-3 bg-white rounded-lg border border-zinc-200">
                   <div>
                     <span className="text-xs text-zinc-500 block">البنك</span>
-                    <span className="font-medium">{BANK_DETAILS.bankName}</span>
+                    <span className="font-medium text-zinc-900">{BANK_DETAILS.bankNameAr}</span>
                   </div>
                   <button
                     onClick={() => handleCopy(BANK_DETAILS.bankName, 'bank')}
-                    className="p-2 hover:bg-zinc-200 rounded-lg transition-colors"
+                    className="p-2 hover:bg-zinc-100 rounded-lg transition-colors"
                   >
                     {copiedField === 'bank' ? (
                       <CheckCircle className="h-4 w-4 text-emerald-600" />
@@ -439,14 +483,15 @@ export function Billing() {
                     )}
                   </button>
                 </div>
-                <div className="flex justify-between items-center p-3 bg-zinc-50 rounded-lg">
+
+                <div className="flex justify-between items-center p-3 bg-white rounded-lg border border-zinc-200">
                   <div>
                     <span className="text-xs text-zinc-500 block">اسم الحساب</span>
-                    <span className="font-medium">{BANK_DETAILS.accountName}</span>
+                    <span className="font-medium text-zinc-900">{BANK_DETAILS.accountName}</span>
                   </div>
                   <button
                     onClick={() => handleCopy(BANK_DETAILS.accountName, 'name')}
-                    className="p-2 hover:bg-zinc-200 rounded-lg transition-colors"
+                    className="p-2 hover:bg-zinc-100 rounded-lg transition-colors"
                   >
                     {copiedField === 'name' ? (
                       <CheckCircle className="h-4 w-4 text-emerald-600" />
@@ -455,14 +500,15 @@ export function Billing() {
                     )}
                   </button>
                 </div>
-                <div className="flex justify-between items-center p-3 bg-zinc-50 rounded-lg">
+
+                <div className="flex justify-between items-center p-3 bg-white rounded-lg border border-zinc-200">
                   <div>
                     <span className="text-xs text-zinc-500 block">IBAN</span>
-                    <span className="font-medium font-mono text-sm">{BANK_DETAILS.iban}</span>
+                    <span className="font-medium font-mono text-sm text-zinc-900">{BANK_DETAILS.iban}</span>
                   </div>
                   <button
                     onClick={() => handleCopy(BANK_DETAILS.iban, 'iban')}
-                    className="p-2 hover:bg-zinc-200 rounded-lg transition-colors"
+                    className="p-2 hover:bg-zinc-100 rounded-lg transition-colors"
                   >
                     {copiedField === 'iban' ? (
                       <CheckCircle className="h-4 w-4 text-emerald-600" />
@@ -472,39 +518,42 @@ export function Billing() {
                   </button>
                 </div>
               </div>
-            </div>
 
-            <div className="border-t border-zinc-200 pt-6">
               <Button
                 variant="outline"
-                className="w-full mb-4 border-green-500 text-green-600 hover:bg-green-50"
+                className="w-full mb-3 border-green-500 text-green-600 hover:bg-green-50"
                 onClick={handleWhatsAppClick}
               >
                 <MessageCircle className="h-5 w-5 ml-2" />
-                إرسال الإيصال عبر واتساب
+                إرسال إثبات الدفع عبر واتساب
               </Button>
-            </div>
 
-            <div className="border-t border-zinc-200 pt-6">
-              <h4 className="font-semibold text-zinc-900 mb-3">أو أدخل رقم الإيصال</h4>
-              <Input
-                value={receiptRef}
-                onChange={(e) => setReceiptRef(e.target.value)}
-                placeholder="رقم الحوالة أو الإيصال"
-                className="mb-4"
-              />
-              <Button
-                variant="primary"
-                className="w-full"
-                onClick={handleSubmitManualPayment}
-                disabled={isProcessing || !receiptRef.trim()}
-              >
-                {isProcessing ? 'جاري الإرسال...' : 'لقد قمت بالدفع'}
-              </Button>
+              <div className="space-y-3">
+                <Input
+                  value={receiptRef}
+                  onChange={(e) => setReceiptRef(e.target.value)}
+                  placeholder="رقم الحوالة / اسم المحوّل (اختياري)"
+                />
+                <Button
+                  variant="primary"
+                  className="w-full bg-emerald-600 hover:bg-emerald-700"
+                  onClick={handleSubmitManualPayment}
+                  disabled={isProcessing}
+                >
+                  {isProcessing ? (
+                    'جاري الإرسال...'
+                  ) : (
+                    <>
+                      <CheckCircle className="h-5 w-5 ml-2" />
+                      لقد قمت بالتحويل
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
 
             <button
-              onClick={() => setIsManualPaymentModalOpen(false)}
+              onClick={() => setIsPaymentModalOpen(false)}
               className="w-full text-center text-sm text-zinc-500 hover:text-zinc-700 py-2"
             >
               إلغاء

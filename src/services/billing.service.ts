@@ -1,13 +1,13 @@
 import { supabase } from './supabase';
 import { AuditService } from './audit.service';
 import type { Billing, PlanType } from '../types/billing';
-import { PLAN_CONFIG } from '../types/billing';
+import { PLAN_CONFIG, WHATSAPP_NUMBER } from '../types/billing';
 
-const PLAN_MAPPING: Record<PlanType, { limit: number | null; price: number }> = {
-  starter: { limit: 500, price: 25 },
-  pro: { limit: 2000, price: 35 },
-  elite: { limit: 5000, price: 50 },
-  enterprise: { limit: null, price: 100 },
+const PLAN_LIMITS: Record<PlanType, number | null> = {
+  starter: 500,
+  pro: 2000,
+  elite: 5000,
+  enterprise: null,
 };
 
 export class BillingService {
@@ -33,14 +33,6 @@ export class BillingService {
     const endsAt = new Date(billing.trial_ends_at);
     const diffMs = endsAt.getTime() - now.getTime();
     return diffMs > 0 ? diffMs : 0;
-  }
-
-  static isPlanActive(billing: Billing | null, businessStatus?: string, manualPaymentStatus?: string): boolean {
-    if (!billing) return false;
-    if (billing.status === 'active') return true;
-    if (this.isTrialActive(billing)) return true;
-    if (manualPaymentStatus === 'pending') return true;
-    return false;
   }
 
   static shouldBlockAccess(billing: Billing | null, manualPaymentStatus?: string): boolean {
@@ -89,23 +81,63 @@ export class BillingService {
   }
 
   static async submitManualPayment(
-    workspaceId: string,
-    planName: string,
-    amount: number,
-    receiptRef: string
-  ): Promise<void> {
-    const { error } = await supabase.rpc('submit_manual_payment', {
-      workspace_id: workspaceId,
-      plan_name: planName,
-      amount,
-      receipt_ref: receiptRef,
+    businessId: string,
+    plan: PlanType,
+    receiptRef?: string
+  ): Promise<Billing> {
+    const planConfig = PLAN_CONFIG[plan];
+    const planLimit = PLAN_LIMITS[plan];
+
+    const { data: billingBefore } = await supabase
+      .from('business_billing')
+      .select('*')
+      .eq('business_id', businessId)
+      .maybeSingle();
+
+    const { data: billingData, error: billingError } = await supabase
+      .from('business_billing')
+      .update({
+        plan,
+        lifetime_price_usd: planConfig.price,
+        monthly_order_limit: planLimit,
+        notes: receiptRef ? `Manual Payment - Receipt: ${receiptRef}` : 'Manual Payment - Pending Verification',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('business_id', businessId)
+      .select()
+      .single();
+
+    if (billingError) throw billingError;
+
+    const { error: businessError } = await supabase
+      .from('businesses')
+      .update({
+        manual_payment_status: 'pending',
+        plan_type: `${plan}_pending`,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', businessId);
+
+    if (businessError) throw businessError;
+
+    await AuditService.log({
+      business_id: businessId,
+      entity_type: 'billing',
+      entity_id: billingData.id,
+      action: 'manual_payment_submitted',
+      changes: {
+        before: this.extractBillingFields(billingBefore),
+        after: this.extractBillingFields(billingData),
+        receipt_ref: receiptRef,
+      },
     });
 
-    if (error) throw error;
+    return billingData;
   }
 
   static async setPlan(businessId: string, plan: PlanType): Promise<Billing> {
-    const planConfig = PLAN_MAPPING[plan];
+    const planConfig = PLAN_CONFIG[plan];
+    const planLimit = PLAN_LIMITS[plan];
 
     const { data: before } = await supabase
       .from('business_billing')
@@ -118,7 +150,7 @@ export class BillingService {
       .update({
         plan,
         lifetime_price_usd: planConfig.price,
-        monthly_order_limit: planConfig.limit,
+        monthly_order_limit: planLimit,
         updated_at: new Date().toISOString(),
       })
       .eq('business_id', businessId)
@@ -207,12 +239,14 @@ export class BillingService {
     return Math.round(originalPrice * 0.5);
   }
 
-  static formatWhatsAppMessage(plan: string, amount: number, workspaceName: string): string {
-    return encodeURIComponent(
+  static generateWhatsAppLink(plan: string, amount: number, workspaceName: string, receiptRef?: string): string {
+    const message = encodeURIComponent(
       `مرحباً، أود الاشتراك في خطة ${plan}\n` +
       `المبلغ: $${amount}\n` +
       `اسم المتجر: ${workspaceName}\n` +
+      (receiptRef ? `رقم الحوالة: ${receiptRef}\n` : '') +
       `أرفقت إيصال الدفع.`
     );
+    return `https://wa.me/${WHATSAPP_NUMBER}?text=${message}`;
   }
 }
