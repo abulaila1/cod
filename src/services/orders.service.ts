@@ -61,7 +61,7 @@ export class OrdersService {
         status:statuses(id, name_ar, name_en, color, is_default),
         country:countries(id, name_ar, currency),
         carrier:carriers(id, name_ar),
-        employee:employees(id, name_ar, role)
+        employee:employees(id, name_ar, name_en)
       `,
         { count: 'exact' }
       )
@@ -144,7 +144,7 @@ export class OrdersService {
         status:statuses(id, name_ar, name_en, color, is_default),
         country:countries(id, name_ar, currency),
         carrier:carriers(id, name_ar),
-        employee:employees(id, name_ar, role)
+        employee:employees(id, name_ar, name_en)
       `
       )
       .eq('id', orderId)

@@ -30,7 +30,7 @@ export interface Employee {
   id: string;
   business_id: string;
   name_ar: string;
-  role: string | null;
+  name_en: string | null;
   active: boolean;
   created_at: string;
 }

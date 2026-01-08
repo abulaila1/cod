@@ -7,6 +7,10 @@ export interface PerformanceBreakdown {
   delivery_rate: number;
   gross_sales: number;
   net_profit: number;
+  total?: number;
+  delivered?: number;
+  returned?: number;
+  confirmation_rate?: number;
 }
 
 export interface ProductPerformance extends PerformanceBreakdown {

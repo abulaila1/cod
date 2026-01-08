@@ -180,6 +180,10 @@ export class PerformanceService {
     const result = Array.from(breakdown.values());
     result.forEach((item) => {
       item.delivery_rate = item.total_orders > 0 ? (item.delivered_orders / item.total_orders) * 100 : 0;
+      item.total = item.total_orders;
+      item.delivered = item.delivered_orders;
+      item.returned = item.return_orders;
+      item.confirmation_rate = item.delivery_rate;
     });
 
     return result.sort((a, b) => b.total_orders - a.total_orders);

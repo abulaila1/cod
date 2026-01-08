@@ -21,7 +21,7 @@ export function EmployeesManagement() {
 
   const [formData, setFormData] = useState({
     name_ar: '',
-    role: '',
+    name_en: '',
   });
 
   useEffect(() => {
@@ -48,7 +48,7 @@ export function EmployeesManagement() {
 
   const handleAdd = () => {
     setEditingEmployee(null);
-    setFormData({ name_ar: '', role: '' });
+    setFormData({ name_ar: '', name_en: '' });
     setIsModalOpen(true);
   };
 
@@ -58,7 +58,7 @@ export function EmployeesManagement() {
       setEditingEmployee(employee);
       setFormData({
         name_ar: employee.name_ar,
-        role: employee.role || '',
+        name_en: employee.name_en || '',
       });
       setIsModalOpen(true);
     }
@@ -118,7 +118,7 @@ export function EmployeesManagement() {
 
   const columns: EntityColumn[] = [
     { key: 'name_ar', label: 'الاسم' },
-    { key: 'role', label: 'الدور' },
+    { key: 'name_en', label: 'الاسم بالانجليزي' },
   ];
 
   if (!currentBusiness) {
@@ -170,11 +170,11 @@ export function EmployeesManagement() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-zinc-700 mb-2">الدور</label>
+          <label className="block text-sm font-medium text-zinc-700 mb-2">الاسم بالانجليزي</label>
           <Input
-            value={formData.role}
-            onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-            placeholder="مثال: موظف مبيعات"
+            value={formData.name_en}
+            onChange={(e) => setFormData({ ...formData, name_en: e.target.value })}
+            placeholder="Employee Name"
           />
         </div>
       </EntityModal>

@@ -86,7 +86,7 @@ export function Employees() {
   };
 
   const getEmployeePerformance = (employeeId: string) => {
-    return performanceData.find(p => p.entity_id === employeeId);
+    return performanceData.find(p => p.id === employeeId);
   };
 
   const handleOpenModal = (employee?: Employee) => {

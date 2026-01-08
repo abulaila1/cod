@@ -78,7 +78,7 @@ export function EmployeeDetails() {
       setAnalytics(anal);
       setBonuses(bon);
       setLoginHistory(logins);
-      setPerformance(perf.find(p => p.entity_id === id) || null);
+      setPerformance(perf.find(p => p.id === id) || null);
     } catch (error) {
       console.error('Failed to load employee details:', error);
     } finally {
