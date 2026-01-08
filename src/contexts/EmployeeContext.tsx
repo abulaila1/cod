@@ -28,7 +28,7 @@ export function EmployeeProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async (businessId: string, email: string, password: string) => {
-    const employeeData = await EmployeesService.login(businessId, email, password);
+    const employeeData = await EmployeesService.verifyLogin(businessId, email, password);
     if (!employeeData) {
       throw new Error('البريد الإلكتروني أو كلمة المرور غير صحيحة');
     }
