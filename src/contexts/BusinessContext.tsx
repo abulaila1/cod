@@ -104,16 +104,13 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
         return business;
       }
 
-      const { data: newBusiness, error: insertError } = await supabase
-        .from('businesses')
-        .insert({ name: 'متجري' })
-        .select()
-        .single();
+      const { data: businessId, error: rpcError } = await supabase
+        .rpc('create_workspace', { p_name: 'متجري' });
 
-      if (insertError) throw insertError;
+      if (rpcError) throw rpcError;
 
       for (let i = 0; i < 20; i++) {
-        await new Promise(resolve => setTimeout(resolve, 300));
+        await new Promise(resolve => setTimeout(resolve, 500));
 
         const { data: checkBusinesses } = await supabase
           .from('business_members')
@@ -123,6 +120,7 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
 
         if (checkBusinesses && checkBusinesses.length > 0) {
           const business = checkBusinesses[0].businesses as Business;
+          await refreshBusinesses();
           return business;
         }
       }
