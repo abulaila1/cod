@@ -71,7 +71,7 @@ export function Settings() {
           icon={Package}
           title="المنتجات"
           description="إدارة المنتجات والتكاليف الأساسية"
-          path="/app/settings/products"
+          path="/app/products"
           iconColor="text-purple-600"
           iconBg="bg-purple-50"
         />
@@ -80,7 +80,7 @@ export function Settings() {
           icon={Globe}
           title="الدول والمناطق"
           description="إدارة الدول والمناطق الجغرافية"
-          path="/app/settings/countries"
+          path="/app/countries"
           iconColor="text-green-600"
           iconBg="bg-green-50"
         />
@@ -89,7 +89,7 @@ export function Settings() {
           icon={Truck}
           title="شركات الشحن"
           description="إدارة شركات الشحن والتوصيل"
-          path="/app/settings/carriers"
+          path="/app/carriers"
           iconColor="text-orange-600"
           iconBg="bg-orange-50"
         />
@@ -98,7 +98,7 @@ export function Settings() {
           icon={Users}
           title="الموظفين"
           description="إدارة الموظفين والمسؤولين عن الطلبات"
-          path="/app/settings/employees"
+          path="/app/employees"
           iconColor="text-cyan-600"
           iconBg="bg-cyan-50"
         />
