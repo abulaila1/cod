@@ -6,6 +6,7 @@ import type { Employee, CreateEmployeeInput, UpdateEmployeeInput } from '@/servi
 import { PerformanceService } from '@/services/performance.service';
 import { PageHeader } from '@/components/common/PageHeader';
 import { Button, Input, Modal } from '@/components/ui';
+import { useToast } from '@/components/ui/Toast';
 import {
   Plus,
   Search,
@@ -50,6 +51,7 @@ const initialFormData: EmployeeFormData = {
 export function Employees() {
   const navigate = useNavigate();
   const { currentBusiness, formatCurrency } = useBusiness();
+  const { showToast } = useToast();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [performanceData, setPerformanceData] = useState<PerformanceBreakdown[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -72,14 +74,23 @@ export function Employees() {
 
     try {
       setIsLoading(true);
+
+      const today = new Date();
+      const thirtyDaysAgo = new Date(today);
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
       const [employeesList, performance] = await Promise.all([
         EmployeesService.list(currentBusiness.id),
-        PerformanceService.getEmployeeBreakdown(currentBusiness.id, {}),
+        PerformanceService.getEmployeeBreakdown(currentBusiness.id, {
+          date_from: thirtyDaysAgo.toISOString().split('T')[0],
+          date_to: today.toISOString().split('T')[0],
+        }),
       ]);
       setEmployees(employeesList);
       setPerformanceData(performance);
     } catch (error) {
       console.error('Failed to load employees:', error);
+      showToast('error', 'فشل في تحميل بيانات الموظفين');
     } finally {
       setIsLoading(false);
     }
@@ -124,10 +135,13 @@ export function Employees() {
   };
 
   const handleSave = async () => {
-    if (!currentBusiness || !formData.name_ar.trim()) return;
+    if (!currentBusiness || !formData.name_ar.trim()) {
+      showToast('warning', 'يرجى إدخال اسم الموظف');
+      return;
+    }
 
     if (formData.permissions.length === 0) {
-      alert('يجب اختيار صلاحية واحدة على الأقل');
+      showToast('warning', 'يجب اختيار صلاحية واحدة على الأقل');
       return;
     }
 
@@ -146,6 +160,7 @@ export function Employees() {
           updateInput.password = formData.password;
         }
         await EmployeesService.update(currentBusiness.id, editingEmployee.id, updateInput);
+        showToast('success', 'تم تحديث بيانات الموظف بنجاح');
       } else {
         const createInput: CreateEmployeeInput = {
           name_ar: formData.name_ar,
@@ -156,13 +171,20 @@ export function Employees() {
           permissions: formData.permissions,
         };
         await EmployeesService.create(currentBusiness.id, createInput);
+        showToast('success', 'تم إضافة الموظف بنجاح');
       }
 
       handleCloseModal();
-      loadData();
+      await loadData();
     } catch (error: any) {
       console.error('Failed to save employee:', error);
-      alert(error.message || 'حدث خطأ أثناء الحفظ');
+      const errorMessage = error.message || 'حدث خطأ أثناء الحفظ';
+
+      if (errorMessage.includes('duplicate') || errorMessage.includes('unique')) {
+        showToast('error', 'البريد الإلكتروني مستخدم بالفعل');
+      } else {
+        showToast('error', errorMessage);
+      }
     } finally {
       setIsSaving(false);
     }
@@ -173,9 +195,11 @@ export function Employees() {
 
     try {
       await EmployeesService.toggleActive(currentBusiness.id, employee.id, !employee.is_active);
-      loadData();
+      await loadData();
+      showToast('success', employee.is_active ? 'تم تعطيل الموظف' : 'تم تفعيل الموظف');
     } catch (error) {
       console.error('Failed to toggle employee status:', error);
+      showToast('error', 'فشل في تحديث حالة الموظف');
     }
     setActiveMenu(null);
   };
@@ -186,9 +210,11 @@ export function Employees() {
 
     try {
       await EmployeesService.delete(currentBusiness.id, employee.id);
-      loadData();
+      await loadData();
+      showToast('success', 'تم حذف الموظف بنجاح');
     } catch (error) {
       console.error('Failed to delete employee:', error);
+      showToast('error', 'فشل في حذف الموظف');
     }
     setActiveMenu(null);
   };

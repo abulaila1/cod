@@ -136,6 +136,7 @@ export class EmployeesService {
       ...e,
       permissions: e.permissions || [],
       salary: e.salary || 0,
+      active: e.is_active,
     }));
   }
 
@@ -154,6 +155,7 @@ export class EmployeesService {
       ...data,
       permissions: data.permissions || [],
       salary: data.salary || 0,
+      active: data.is_active,
     };
   }
 
@@ -192,6 +194,7 @@ export class EmployeesService {
       ...data,
       permissions: data.permissions || [],
       salary: data.salary || 0,
+      active: data.is_active,
     };
   }
 
@@ -240,6 +243,7 @@ export class EmployeesService {
       ...data,
       permissions: data.permissions || [],
       salary: data.salary || 0,
+      active: data.is_active,
     };
   }
 
@@ -308,6 +312,7 @@ export class EmployeesService {
       ...data,
       permissions: data.permissions || [],
       salary: data.salary || 0,
+      active: data.is_active,
       last_login_at: new Date().toISOString(),
     };
   }
