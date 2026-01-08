@@ -422,23 +422,25 @@ export class OrdersService {
           }
         }
 
-        if (!customerName || !phoneNumber) {
-          errors.push(`الصف ${i + 2}: اسم العميل ورقم الهاتف مطلوبان`);
+        if (!customerName) {
+          errors.push(`الصف ${i + 2}: اسم العميل مطلوب`);
           continue;
         }
 
+        const timestamp = Date.now();
+        const random = Math.random().toString(36).substring(2, 6).toUpperCase();
+        orderData.order_number = `ORD-${timestamp}-${random}`;
+        orderData.customer_name = customerName;
+        orderData.customer_phone = phoneNumber || null;
+        orderData.customer_address = [governorate, cityAddress].filter(Boolean).join(' - ') || null;
         orderData.revenue = price * quantity;
         orderData.notes = [
-          `العميل: ${customerName}`,
-          `الهاتف: ${phoneNumber}`,
-          `المحافظة: ${governorate}`,
-          `العنوان: ${cityAddress}`,
           `المنتج: ${productName}`,
           `الكمية: ${quantity}`,
           notes ? `ملاحظات: ${notes}` : '',
         ]
           .filter(Boolean)
-          .join(' | ');
+          .join(' | ') || null;
 
         const { error } = await supabase.from('orders').insert(orderData);
 
@@ -486,6 +488,9 @@ export class OrdersService {
     businessId: string,
     orderData: {
       order_date: string;
+      customer_name: string;
+      customer_phone?: string;
+      customer_address?: string;
       country_id?: string;
       carrier_id?: string;
       employee_id?: string;
@@ -498,11 +503,18 @@ export class OrdersService {
   ): Promise<Order> {
     await this.ensureCanAddOrders(businessId, 1);
 
+    const timestamp = Date.now();
+    const random = Math.random().toString(36).substring(2, 6).toUpperCase();
+
     const { data, error } = await supabase
       .from('orders')
       .insert({
         business_id: businessId,
+        order_number: `ORD-${timestamp}-${random}`,
         order_date: orderData.order_date,
+        customer_name: orderData.customer_name,
+        customer_phone: orderData.customer_phone || null,
+        customer_address: orderData.customer_address || null,
         country_id: orderData.country_id || null,
         carrier_id: orderData.carrier_id || null,
         employee_id: orderData.employee_id || null,
