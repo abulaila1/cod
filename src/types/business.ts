@@ -1,6 +1,9 @@
 export type MemberRole = 'admin' | 'manager' | 'agent' | 'viewer';
 export type MemberStatus = 'active' | 'suspended';
 
+export type PlanType = 'monthly' | 'annual' | 'lifetime';
+export type ManualPaymentStatus = 'none' | 'pending' | 'verified' | 'rejected';
+
 export interface Business {
   id: string;
   name: string;
@@ -8,6 +11,10 @@ export interface Business {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  plan_type: PlanType;
+  is_lifetime_deal: boolean;
+  manual_payment_status: ManualPaymentStatus;
+  max_orders_limit: number | null;
 }
 
 export interface BusinessMember {

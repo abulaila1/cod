@@ -47,6 +47,8 @@ export interface Product {
   is_active: boolean;
   created_by: string | null;
   created_at: string;
+  physical_stock: number;
+  reserved_stock: number;
 }
 
 export interface Order {
@@ -69,6 +71,8 @@ export interface Order {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  locked_by: string | null;
+  locked_at: string | null;
 }
 
 export interface OrderItem {
@@ -85,12 +89,11 @@ export interface OrderItem {
 export interface AuditLog {
   id: string;
   business_id: string;
-  user_id: string | null;
+  user_id: string;
   entity_type: string;
   entity_id: string;
   action: string;
-  before: any;
-  after: any;
+  changes: any;
   created_at: string;
 }
 

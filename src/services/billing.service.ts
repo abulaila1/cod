@@ -83,11 +83,10 @@ export class BillingService {
 
     await AuditService.log({
       business_id: businessId,
-      entity_type: 'billing',
+      entity_type: 'business',
       entity_id: data.id,
-      action: 'set_plan',
-      before: this.extractBillingFields(before),
-      after: this.extractBillingFields(data),
+      action: 'update',
+      changes: { before: this.extractBillingFields(before), after: this.extractBillingFields(data) },
     });
 
     return data;
@@ -119,11 +118,10 @@ export class BillingService {
 
     await AuditService.log({
       business_id: businessId,
-      entity_type: 'billing',
+      entity_type: 'business',
       entity_id: data.id,
-      action: wasTrial ? 'trial_converted' : 'activate',
-      before: this.extractBillingFields(before),
-      after: this.extractBillingFields(data),
+      action: 'update',
+      changes: { before: this.extractBillingFields(before), after: this.extractBillingFields(data), wasTrial },
     });
 
     return data;
@@ -150,11 +148,10 @@ export class BillingService {
 
     await AuditService.log({
       business_id: businessId,
-      entity_type: 'billing',
+      entity_type: 'business',
       entity_id: data.id,
-      action: 'deactivate',
-      before: this.extractBillingFields(before),
-      after: this.extractBillingFields(data),
+      action: 'update',
+      changes: { before: this.extractBillingFields(before), after: this.extractBillingFields(data) },
     });
 
     return data;

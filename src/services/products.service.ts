@@ -67,7 +67,7 @@ export class ProductsService {
       entity_type: 'products',
       entity_id: data.id,
       action: 'create',
-      after: data,
+      changes: { created: data },
     });
 
     return data;
@@ -100,8 +100,7 @@ export class ProductsService {
       entity_type: 'products',
       entity_id: productId,
       action: 'update',
-      before,
-      after: data,
+      changes: { before, after: data },
     });
 
     return data;
@@ -134,8 +133,7 @@ export class ProductsService {
       entity_type: 'products',
       entity_id: productId,
       action: 'toggle_active',
-      before,
-      after: data,
+      changes: { before, after: data },
     });
 
     return data;
@@ -196,7 +194,7 @@ export class ProductsService {
       entity_type: 'products',
       entity_id: 'bulk',
       action: 'import',
-      after: { success: results.success, errors_count: results.errors.length },
+      changes: { success: results.success, errors_count: results.errors.length },
     });
 
     return results;

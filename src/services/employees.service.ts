@@ -64,7 +64,7 @@ export class EmployeesService {
       entity_type: 'employees',
       entity_id: data.id,
       action: 'create',
-      after: data,
+      changes: { created: data },
     });
 
     return data;
@@ -97,8 +97,7 @@ export class EmployeesService {
       entity_type: 'employees',
       entity_id: employeeId,
       action: 'update',
-      before,
-      after: data,
+      changes: { before, after: data },
     });
 
     return data;
@@ -131,8 +130,7 @@ export class EmployeesService {
       entity_type: 'employees',
       entity_id: employeeId,
       action: 'toggle_active',
-      before,
-      after: data,
+      changes: { before, after: data },
     });
 
     return data;
@@ -190,7 +188,7 @@ export class EmployeesService {
       entity_type: 'employees',
       entity_id: 'bulk',
       action: 'import',
-      after: { success: results.success, errors_count: results.errors.length },
+      changes: { success: results.success, errors_count: results.errors.length },
     });
 
     return results;
