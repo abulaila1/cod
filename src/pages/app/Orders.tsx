@@ -84,7 +84,7 @@ export function Orders() {
       setFilters(queryFilters);
       setHasAppliedFilters(true);
     }
-  }, []);
+  }, [searchParams]);
 
   const handleExportCsv = async () => {
     if (!currentBusiness) return;

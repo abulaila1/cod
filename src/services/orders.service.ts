@@ -38,6 +38,23 @@ export interface BulkUpdateResult {
 }
 
 export class OrdersService {
+  static async testConnection(businessId: string): Promise<{ success: boolean; count: number; error?: string }> {
+    try {
+      const { data, error, count } = await supabase
+        .from('orders')
+        .select('id', { count: 'exact' })
+        .eq('business_id', businessId);
+
+      if (error) {
+        return { success: false, count: 0, error: error.message };
+      }
+
+      return { success: true, count: count || 0 };
+    } catch (err) {
+      return { success: false, count: 0, error: String(err) };
+    }
+  }
+
   private static async ensureCanAddOrders(
     businessId: string,
     ordersToAdd: number
@@ -63,12 +80,16 @@ export class OrdersService {
     pagination: OrderPagination = { page: 1, pageSize: 25 },
     sorting: OrderSorting = { field: 'order_date', direction: 'desc' }
   ): Promise<OrderListResponse> {
+    if (!businessId) {
+      return { rows: [], total_count: 0, page_count: 0 };
+    }
+
     let query = supabase
       .from('orders')
       .select(
         `
         *,
-        status:statuses(id, name_ar, name_en, color, is_default, key, counts_as_delivered, counts_as_return),
+        status:statuses(id, name_ar, name_en, color, is_default, counts_as_delivered, counts_as_return),
         country:countries(id, name_ar, currency),
         city:cities(id, name_ar, name_en, shipping_cost),
         carrier:carriers(id, name_ar, name_en, tracking_url),
@@ -137,7 +158,7 @@ export class OrdersService {
     if (filters.search) {
       const searchTerm = `%${filters.search}%`;
       query = query.or(
-        `id.ilike.${searchTerm},order_number.ilike.${searchTerm},customer_name.ilike.${searchTerm},customer_phone.ilike.${searchTerm},tracking_number.ilike.${searchTerm},notes.ilike.${searchTerm}`
+        `order_number.ilike.${searchTerm},customer_name.ilike.${searchTerm},customer_phone.ilike.${searchTerm},tracking_number.ilike.${searchTerm},notes.ilike.${searchTerm}`
       );
     }
 
@@ -147,26 +168,32 @@ export class OrdersService {
     query = query.order(sorting.field, { ascending: sorting.direction === 'asc' });
     query = query.range(from, to);
 
-    let { data, error, count } = await query;
+    const { data, error, count } = await query;
 
-    if (error) throw error;
+    if (error) {
+      console.error('Orders query error:', error);
+      return { rows: [], total_count: 0, page_count: 0 };
+    }
 
-    if (filters.product_id && data) {
+    let filteredData = data || [];
+    let filteredCount = count || 0;
+
+    if (filters.product_id && filteredData.length > 0) {
       const { data: orderItems } = await supabase
         .from('order_items')
         .select('order_id')
         .eq('product_id', filters.product_id);
 
       const orderIdsWithProduct = new Set(orderItems?.map((i) => i.order_id) || []);
-      data = data.filter((order) => orderIdsWithProduct.has(order.id));
-      count = data.length;
+      filteredData = filteredData.filter((order) => orderIdsWithProduct.has(order.id));
+      filteredCount = filteredData.length;
     }
 
-    const total_count = count || 0;
+    const total_count = filteredCount;
     const page_count = Math.ceil(total_count / pagination.pageSize);
 
     return {
-      rows: (data || []) as OrderWithRelations[],
+      rows: filteredData as OrderWithRelations[],
       total_count,
       page_count,
     };
@@ -178,7 +205,7 @@ export class OrdersService {
       .select(
         `
         *,
-        status:statuses(id, name_ar, name_en, color, is_default, key, counts_as_delivered, counts_as_return),
+        status:statuses(id, name_ar, name_en, color, is_default, counts_as_delivered, counts_as_return),
         country:countries(id, name_ar, currency),
         city:cities(id, name_ar, name_en, shipping_cost),
         carrier:carriers(id, name_ar, name_en, tracking_url),

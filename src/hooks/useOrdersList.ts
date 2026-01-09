@@ -30,11 +30,18 @@ export function useOrdersList(businessId: string | undefined) {
     if (businessId) {
       loadOrders();
       loadFilterOptions();
+    } else {
+      setOrders([]);
+      setIsLoading(false);
     }
   }, [businessId, filters, currentPage, pageSize, searchTerm]);
 
   const loadOrders = async () => {
-    if (!businessId) return;
+    if (!businessId) {
+      setOrders([]);
+      setIsLoading(false);
+      return;
+    }
 
     try {
       setIsLoading(true);
@@ -47,11 +54,14 @@ export function useOrdersList(businessId: string | undefined) {
         { field: 'created_at', direction: 'desc' }
       );
 
-      setOrders(response.rows);
-      setTotalCount(response.total_count);
-      setPageCount(response.page_count);
+      setOrders(response.rows || []);
+      setTotalCount(response.total_count || 0);
+      setPageCount(response.page_count || 0);
     } catch (error) {
       console.error('Failed to load orders:', error);
+      setOrders([]);
+      setTotalCount(0);
+      setPageCount(0);
     } finally {
       setIsLoading(false);
     }
