@@ -11,6 +11,45 @@ export interface UsageStatus {
 }
 
 export class UsageService {
+  static async isSuperAdmin(userId: string): Promise<boolean> {
+    try {
+      const { data, error } = await supabase
+        .from('super_admins')
+        .select('id')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (error) {
+        console.error('Error checking super admin status:', error);
+        return false;
+      }
+
+      return !!data;
+    } catch (err) {
+      console.error('Error checking super admin status:', err);
+      return false;
+    }
+  }
+
+  static async getBusinessOwnerId(businessId: string): Promise<string | null> {
+    try {
+      const { data, error } = await supabase
+        .from('businesses')
+        .select('created_by')
+        .eq('id', businessId)
+        .maybeSingle();
+
+      if (error || !data) {
+        console.error('Error getting business owner:', error);
+        return null;
+      }
+
+      return data.created_by;
+    } catch (err) {
+      console.error('Error getting business owner:', err);
+      return null;
+    }
+  }
   static async getMonthlyOrdersCount(
     businessId: string,
     yearMonth?: string
@@ -53,8 +92,15 @@ export class UsageService {
 
     const month_label = `${monthNames[now.getMonth()]} ${now.getFullYear()}`;
 
-    const billing = await BillingService.getBilling(businessId);
-    const limit = billing?.monthly_order_limit || null;
+    const ownerId = await this.getBusinessOwnerId(businessId);
+    const isSuperAdmin = ownerId ? await this.isSuperAdmin(ownerId) : false;
+
+    let limit: number | null = null;
+
+    if (!isSuperAdmin) {
+      const billing = await BillingService.getBilling(businessId);
+      limit = billing?.monthly_order_limit || null;
+    }
 
     const current_month_count = await this.getMonthlyOrdersCount(businessId);
 
@@ -76,6 +122,13 @@ export class UsageService {
     businessId: string,
     ordersToAdd: number
   ): Promise<{ allowed: boolean; message?: string }> {
+    const ownerId = await this.getBusinessOwnerId(businessId);
+    const isSuperAdmin = ownerId ? await this.isSuperAdmin(ownerId) : false;
+
+    if (isSuperAdmin) {
+      return { allowed: true };
+    }
+
     const usage = await this.getUsageStatus(businessId);
 
     if (usage.limit === null) {

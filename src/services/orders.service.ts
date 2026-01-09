@@ -59,6 +59,13 @@ export class OrdersService {
     businessId: string,
     ordersToAdd: number
   ): Promise<void> {
+    const ownerId = await UsageService.getBusinessOwnerId(businessId);
+    const isSuperAdmin = ownerId ? await UsageService.isSuperAdmin(ownerId) : false;
+
+    if (isSuperAdmin) {
+      return;
+    }
+
     const billing = await BillingService.getBilling(businessId);
 
     if (billing?.is_trial && BillingService.isTrialExpired(billing)) {
