@@ -405,7 +405,7 @@ function parseDate(value: string): string | null {
   return null;
 }
 
-export function parseCSVLine(line: string): string[] {
+export function parseCSVLine(line: string, delimiter: string = ','): string[] {
   const result: string[] = [];
   let current = '';
   let inQuotes = false;
@@ -420,7 +420,7 @@ export function parseCSVLine(line: string): string[] {
       } else {
         inQuotes = !inQuotes;
       }
-    } else if (char === ',' && !inQuotes) {
+    } else if (char === delimiter && !inQuotes) {
       result.push(current.trim());
       current = '';
     } else {
@@ -430,6 +430,27 @@ export function parseCSVLine(line: string): string[] {
 
   result.push(current.trim());
   return result;
+}
+
+export function detectCSVDelimiter(firstLine: string): string {
+  const delimiters = [';', ',', '\t', '|'];
+  let maxCount = 0;
+  let detected = ',';
+
+  for (const delimiter of delimiters) {
+    let count = 0;
+    let inQuotes = false;
+    for (const char of firstLine) {
+      if (char === '"') inQuotes = !inQuotes;
+      else if (char === delimiter && !inQuotes) count++;
+    }
+    if (count > maxCount) {
+      maxCount = count;
+      detected = delimiter;
+    }
+  }
+
+  return detected;
 }
 
 export function validateImportData(

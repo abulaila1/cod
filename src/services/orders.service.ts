@@ -4,6 +4,7 @@ import { BillingService } from './billing.service';
 import {
   validateImportData,
   parseCSVLine,
+  detectCSVDelimiter,
   type RowValidationError,
 } from '@/utils/order-import';
 import type {
@@ -813,8 +814,9 @@ export class OrdersService {
       };
     }
 
-    const headers = parseCSVLine(lines[0]).map(h => h.replace(/^"|"$/g, ''));
-    const dataRows = lines.slice(1).map(line => parseCSVLine(line).map(v => v.replace(/^"|"$/g, '')));
+    const delimiter = detectCSVDelimiter(lines[0]);
+    const headers = parseCSVLine(lines[0], delimiter).map(h => h.replace(/^"|"$/g, ''));
+    const dataRows = lines.slice(1).map(line => parseCSVLine(line, delimiter).map(v => v.replace(/^"|"$/g, '')));
 
     const validation = validateImportData(headers, dataRows);
 

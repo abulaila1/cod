@@ -43,9 +43,34 @@ export async function parseImportFile(file: File): Promise<ParsedFileData> {
   };
 }
 
+function detectDelimiter(firstLine: string): string {
+  const delimiters = [';', ',', '\t', '|'];
+  let maxCount = 0;
+  let detected = ',';
+
+  for (const delimiter of delimiters) {
+    let count = 0;
+    let inQuotes = false;
+    for (const char of firstLine) {
+      if (char === '"') inQuotes = !inQuotes;
+      else if (char === delimiter && !inQuotes) count++;
+    }
+    if (count > maxCount) {
+      maxCount = count;
+      detected = delimiter;
+    }
+  }
+
+  return detected;
+}
+
 async function parseCSVFile(file: File): Promise<string[][]> {
   const text = await file.text();
   const lines = text.split('\n').filter((line) => line.trim());
+
+  if (lines.length === 0) return [];
+
+  const delimiter = detectDelimiter(lines[0]);
 
   return lines.map((line) => {
     const result: string[] = [];
@@ -63,7 +88,7 @@ async function parseCSVFile(file: File): Promise<string[][]> {
         } else {
           inQuotes = !inQuotes;
         }
-      } else if (char === ',' && !inQuotes) {
+      } else if (char === delimiter && !inQuotes) {
         result.push(current.trim());
         current = '';
       } else {
