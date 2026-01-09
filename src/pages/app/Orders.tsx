@@ -14,7 +14,8 @@ import { OrderDetailsDrawer } from '@/components/orders/OrderDetailsDrawer';
 import { ImportModal } from '@/components/entity/ImportModal';
 import type { OrderFilters } from '@/types/domain';
 import { FileText, X, Search, Filter, Download, Upload, RefreshCw, Loader2 } from 'lucide-react';
-import { generateOrderTemplate } from '@/utils/order-import';
+import { IMPORT_SCHEMA } from '@/utils/order-import';
+import { exportToExcel } from '@/utils/excel';
 import { parseImportFile } from '@/utils/file-parser';
 import type { ImportResult } from '@/services/orders.service';
 
@@ -103,14 +104,47 @@ export function Orders() {
   };
 
   const handleDownloadTemplate = () => {
-    const template = generateOrderTemplate();
-    const blob = new Blob([template], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `orders-template-${new Date().toISOString().split('T')[0]}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
+    const headers = IMPORT_SCHEMA.columns.map(col => ({
+      key: col.key,
+      label: col.label,
+    }));
+
+    const exampleData = [
+      {
+        order_number: 'ORD-001',
+        date: '2024-01-15',
+        customer_name: 'Ahmad Mohamed',
+        phone: '0501234567',
+        city: 'Riyadh',
+        address: 'Naseem District, Street 15',
+        sku: 'WATCH-001',
+        product: 'Smart Watch',
+        quantity: 2,
+        price: 299,
+        status: 'New',
+        notes: 'Urgent order',
+      },
+      {
+        order_number: 'ORD-002',
+        date: '2024-01-15',
+        customer_name: 'Sara Ali',
+        phone: '0551234567',
+        city: 'Jeddah',
+        address: 'Safa District',
+        sku: 'EARBUDS-002',
+        product: 'Bluetooth Earbuds',
+        quantity: 1,
+        price: 150,
+        status: 'Confirmed',
+        notes: '',
+      },
+    ];
+
+    exportToExcel(
+      exampleData,
+      `orders-template-${new Date().toISOString().split('T')[0]}.xlsx`,
+      headers
+    );
   };
 
   const handleImportCsv = async (file: File): Promise<ImportResult> => {
@@ -389,7 +423,7 @@ export function Orders() {
           <CardContent className="text-center py-12">
             <FileText className="h-12 w-12 text-zinc-300 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-zinc-950 mb-2">لا توجد طلبات</h3>
-            <p className="text-zinc-600 mb-6">ابدأ باستيراد طلبات من ملف CSV</p>
+            <p className="text-zinc-600 mb-6">ابدأ باستيراد طلبات من ملف Excel</p>
           </CardContent>
         </Card>
       ) : (

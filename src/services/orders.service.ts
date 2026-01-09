@@ -632,12 +632,19 @@ export class OrdersService {
     if (orderError) throw orderError;
 
     for (const item of input.items) {
+      const { data: product } = await supabase
+        .from('products')
+        .select('cost')
+        .eq('id', item.product_id)
+        .maybeSingle();
+
       await supabase.from('order_items').insert({
         order_id: order.id,
+        business_id: businessId,
         product_id: item.product_id,
         quantity: item.quantity,
         unit_price: item.unit_price,
-        total_price: item.unit_price * item.quantity,
+        unit_cost: product?.cost || 0,
       });
     }
 
@@ -931,10 +938,11 @@ export class OrdersService {
         if (order) {
           await supabase.from('order_items').insert({
             order_id: order.id,
+            business_id: businessId,
             product_id: productData.id,
             quantity: row.quantity,
             unit_price: row.price,
-            total_price: row.price * row.quantity,
+            unit_cost: productData.cost,
           });
         }
 

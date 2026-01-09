@@ -149,17 +149,17 @@ export function ImportModal({
         {!result && (
           <div className="border-2 border-dashed border-zinc-300 rounded-xl p-8 text-center hover:border-zinc-400 transition-colors">
             <Upload className="h-12 w-12 mx-auto text-zinc-400 mb-3" />
-            <p className="text-sm font-medium text-zinc-700 mb-1">اختر ملف Excel أو CSV</p>
-            <p className="text-xs text-zinc-500 mb-4">يدعم: .xlsx, .xls, .csv</p>
+            <p className="text-sm font-medium text-zinc-700 mb-1">اختر ملف Excel</p>
+            <p className="text-xs text-zinc-500 mb-4">يدعم: .xlsx, .xls</p>
             <input
               ref={fileInputRef}
               type="file"
-              accept=".csv,.xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+              accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
               onChange={handleFileChange}
               className="hidden"
-              id="csv-upload"
+              id="excel-upload"
             />
-            <label htmlFor="csv-upload">
+            <label htmlFor="excel-upload">
               <Button variant="outline" onClick={() => fileInputRef.current?.click()} type="button">
                 اختيار ملف
               </Button>
