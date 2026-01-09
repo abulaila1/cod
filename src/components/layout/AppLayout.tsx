@@ -3,6 +3,7 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import { useBusiness } from '@/contexts/BusinessContext';
+import { useSuperAdmin } from '@/contexts/SuperAdminContext';
 import { BillingService } from '@/services/billing.service';
 import type { Billing } from '@/types/billing';
 import { AlertTriangle, CreditCard } from 'lucide-react';
@@ -10,6 +11,7 @@ import { AlertTriangle, CreditCard } from 'lucide-react';
 export function AppLayout() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const { currentBusiness, isLoading: businessLoading } = useBusiness();
+  const { isSuperAdmin } = useSuperAdmin();
   const [billing, setBilling] = useState<Billing | null>(null);
   const [isCheckingAccess, setIsCheckingAccess] = useState(true);
   const location = useLocation();
@@ -40,7 +42,7 @@ export function AppLayout() {
   const manualPaymentStatus = (currentBusiness as any)?.manual_payment_status;
   const shouldBlockAccess = billing && BillingService.shouldBlockAccess(billing, manualPaymentStatus);
   const isTrialExpired = billing && BillingService.isTrialExpired(billing);
-  const showBlocker = shouldBlockAccess && !isBillingPage && !isCheckingAccess && !businessLoading;
+  const showBlocker = shouldBlockAccess && !isBillingPage && !isCheckingAccess && !businessLoading && !isSuperAdmin;
 
   if (showBlocker) {
     return (
