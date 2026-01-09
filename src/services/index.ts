@@ -7,3 +7,4 @@ export * from './seed.service';
 export * from './status.service';
 export * from './entities.service';
 export * from './orders.service';
+export * from './customers.service';

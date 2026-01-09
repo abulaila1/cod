@@ -8,6 +8,7 @@ import type {
   Country,
   Carrier,
   Employee,
+  Product,
 } from '@/types/domain';
 
 export function useOrdersList(businessId: string | undefined) {
@@ -20,6 +21,7 @@ export function useOrdersList(businessId: string | undefined) {
   const [countries, setCountries] = useState<Country[]>([]);
   const [carriers, setCarriers] = useState<Carrier[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
 
   const [filters, setFilters] = useState<OrderFilters>({});
   const [searchTerm, setSearchTerm] = useState('');
@@ -71,17 +73,19 @@ export function useOrdersList(businessId: string | undefined) {
     if (!businessId) return;
 
     try {
-      const [statusesData, countriesData, carriersData, employeesData] = await Promise.all([
+      const [statusesData, countriesData, carriersData, employeesData, productsData] = await Promise.all([
         StatusService.getStatuses(businessId),
         EntitiesService.getCountries(businessId),
         EntitiesService.getCarriers(businessId),
         EntitiesService.getEmployees(businessId),
+        EntitiesService.getProducts(businessId),
       ]);
 
       setStatuses(statusesData);
       setCountries(countriesData);
       setCarriers(carriersData);
       setEmployees(employeesData);
+      setProducts(productsData);
     } catch (error) {
       console.error('Failed to load filter options:', error);
     }
@@ -96,6 +100,7 @@ export function useOrdersList(businessId: string | undefined) {
     countries,
     carriers,
     employees,
+    products,
     filters,
     setFilters,
     searchTerm,

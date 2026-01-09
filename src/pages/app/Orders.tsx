@@ -11,9 +11,10 @@ import { OrdersTable } from '@/components/orders/OrdersTable';
 import { FiltersPanel } from '@/components/orders/FiltersPanel';
 import { BulkActionsBar } from '@/components/orders/BulkActionsBar';
 import { OrderDetailsDrawer } from '@/components/orders/OrderDetailsDrawer';
+import { CreateOrderModal } from '@/components/orders/CreateOrderModal';
 import { ImportModal } from '@/components/entity/ImportModal';
 import type { OrderFilters } from '@/types/domain';
-import { FileText, X, Search, Filter, Download, Upload, RefreshCw, Loader2 } from 'lucide-react';
+import { FileText, X, Search, Filter, Download, Upload, RefreshCw, Loader2, Plus } from 'lucide-react';
 import { IMPORT_SCHEMA } from '@/utils/order-import';
 import { exportToExcel } from '@/utils/excel';
 import { parseImportFile } from '@/utils/file-parser';
@@ -33,6 +34,7 @@ export function Orders() {
     countries,
     carriers,
     employees,
+    products,
     filters,
     setFilters,
     searchTerm,
@@ -50,6 +52,7 @@ export function Orders() {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [hasAppliedFilters, setHasAppliedFilters] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   useEffect(() => {
     const queryFilters: OrderFilters = {};
@@ -379,6 +382,11 @@ export function Orders() {
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
+            <Button onClick={() => setIsCreateModalOpen(true)}>
+              <Plus className="h-4 w-4 ml-2" />
+              إضافة طلب
+            </Button>
+
             <Button
               variant="outline"
               onClick={() => setIsFiltersOpen(true)}
@@ -511,6 +519,24 @@ export function Orders() {
         onDownloadTemplate={handleDownloadTemplate}
         templateAvailable={true}
       />
+
+      {user && (
+        <CreateOrderModal
+          isOpen={isCreateModalOpen}
+          onClose={() => setIsCreateModalOpen(false)}
+          onSuccess={() => {
+            loadOrders();
+            setIsCreateModalOpen(false);
+          }}
+          businessId={currentBusiness.id}
+          userId={user.id}
+          products={products}
+          statuses={statuses}
+          carriers={carriers}
+          employees={employees}
+          currency={currency}
+        />
+      )}
     </>
   );
 }

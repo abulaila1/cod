@@ -76,11 +76,39 @@ export interface Product {
   reserved_stock: number;
 }
 
+export interface Customer {
+  id: string;
+  business_id: string;
+  name: string;
+  phone: string | null;
+  email: string | null;
+  city_id: string | null;
+  city?: City | null;
+  address: string | null;
+  notes: string | null;
+  total_orders: number;
+  total_revenue: number;
+  is_active: boolean;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CustomerCreateInput {
+  name: string;
+  phone?: string;
+  email?: string;
+  city_id?: string;
+  address?: string;
+  notes?: string;
+}
+
 export interface Order {
   id: string;
   business_id: string;
   order_number: string | null;
   order_date: string;
+  customer_id: string | null;
   customer_name: string | null;
   customer_phone: string | null;
   customer_address: string | null;
@@ -157,6 +185,7 @@ export interface OrderWithRelations extends Order {
   city: City | null;
   carrier: Carrier | null;
   employee: Employee | null;
+  customer?: Customer | null;
   lock?: OrderLock | null;
   items?: OrderItemWithProduct[];
 }
@@ -242,6 +271,7 @@ export interface OrderUpdatePatch {
 
 export interface OrderCreateInput {
   order_date: string;
+  customer_id?: string;
   customer_name: string;
   customer_phone?: string;
   customer_address?: string;
@@ -252,6 +282,8 @@ export interface OrderCreateInput {
   status_id?: string;
   order_source?: string;
   notes?: string;
+  shipping_cost?: number;
+  cod_fees?: number;
   items: OrderItemInput[];
 }
 

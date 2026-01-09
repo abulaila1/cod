@@ -637,6 +637,7 @@ export class OrdersService {
         business_id: businessId,
         order_number: `ORD-${timestamp}-${random}`,
         order_date: input.order_date,
+        customer_id: input.customer_id || null,
         customer_name: input.customer_name,
         customer_phone: input.customer_phone || null,
         customer_address: input.customer_address || null,
@@ -649,8 +650,8 @@ export class OrdersService {
         notes: input.notes || null,
         revenue: totalRevenue,
         cost: totalCost,
-        shipping_cost: 0,
-        cod_fees: 0,
+        shipping_cost: input.shipping_cost || 0,
+        cod_fees: input.cod_fees || 0,
         created_by: userId,
       })
       .select()
