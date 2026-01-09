@@ -2,12 +2,19 @@ import { createContext, useContext, useState, useEffect, ReactNode, useCallback 
 import { useAuth } from './AuthContext';
 import { supabase } from '@/services/supabase';
 
+interface BusinessSettings {
+  currency?: string;
+  timezone?: string;
+  language?: string;
+}
+
 interface Business {
   id: string;
   name: string;
   created_by: string;
   created_at: string;
   status?: 'active' | 'suspended';
+  settings?: BusinessSettings;
 }
 
 interface BusinessMember {
@@ -103,7 +110,7 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
 
       const { data: memberships, error: memberError } = await supabase
         .from('business_members')
-        .select('business_id, role, status, businesses(id, name, created_by, created_at, status)')
+        .select('business_id, role, status, businesses(id, name, created_by, created_at, status, settings)')
         .eq('user_id', user!.id)
         .eq('status', 'active');
 
@@ -177,7 +184,7 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
     try {
       const { data: existingBusinesses } = await supabase
         .from('business_members')
-        .select('business_id, businesses(id, name, created_by, created_at)')
+        .select('business_id, businesses(id, name, created_by, created_at, status, settings)')
         .eq('user_id', user!.id)
         .eq('status', 'active');
 
@@ -196,7 +203,7 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
 
         const { data: checkBusinesses } = await supabase
           .from('business_members')
-          .select('business_id, businesses(id, name, created_by, created_at)')
+          .select('business_id, businesses(id, name, created_by, created_at, status, settings)')
           .eq('user_id', user!.id)
           .eq('status', 'active');
 

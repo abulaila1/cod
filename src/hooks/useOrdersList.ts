@@ -44,7 +44,7 @@ export function useOrdersList(businessId: string | undefined) {
         businessId,
         searchFilters,
         { page: currentPage, pageSize },
-        { field: 'order_date', direction: 'desc' }
+        { field: 'created_at', direction: 'desc' }
       );
 
       setOrders(response.rows);

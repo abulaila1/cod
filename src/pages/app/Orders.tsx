@@ -503,7 +503,10 @@ export function Orders() {
 
       <ImportModal
         isOpen={isImportModalOpen}
-        onClose={() => setIsImportModalOpen(false)}
+        onClose={() => {
+          setIsImportModalOpen(false);
+          loadOrders();
+        }}
         onImport={handleImportCsv}
         onDownloadTemplate={handleDownloadTemplate}
         templateAvailable={true}
