@@ -4,8 +4,6 @@ import { BillingService } from './billing.service';
 import {
   validateImportData,
   parseCSVLine,
-  type ImportRowData,
-  type ImportValidationResult,
   type RowValidationError,
 } from '@/utils/order-import';
 import type {
@@ -16,7 +14,12 @@ import type {
   OrderSorting,
   OrderListResponse,
   OrderUpdatePatch,
+  OrderCreateInput,
+  OrderStatistics,
   AuditLogWithUser,
+  BulkTrackingUpdate,
+  BulkDeliveryUpdate,
+  OrderItemWithProduct,
 } from '@/types/domain';
 
 export interface ImportResult {
@@ -25,6 +28,12 @@ export interface ImportResult {
   errors: Array<{ rowNumber: number; errors: RowValidationError[] }>;
   headerErrors: string[];
   productsCreated: string[];
+}
+
+export interface BulkUpdateResult {
+  success: number;
+  failed: number;
+  errors: string[];
 }
 
 export class OrdersService {
@@ -58,9 +67,10 @@ export class OrdersService {
       .select(
         `
         *,
-        status:statuses(id, name_ar, name_en, color, is_default),
+        status:statuses(id, name_ar, name_en, color, is_default, key, counts_as_delivered, counts_as_return),
         country:countries(id, name_ar, currency),
-        carrier:carriers(id, name_ar),
+        city:cities(id, name_ar, name_en, shipping_cost),
+        carrier:carriers(id, name_ar, name_en, tracking_url),
         employee:employees(id, name_ar, name_en)
       `,
         { count: 'exact' }
@@ -79,6 +89,10 @@ export class OrdersService {
       query = query.eq('country_id', filters.country_id);
     }
 
+    if (filters.city_id) {
+      query = query.eq('city_id', filters.city_id);
+    }
+
     if (filters.carrier_id) {
       query = query.eq('carrier_id', filters.carrier_id);
     }
@@ -91,14 +105,38 @@ export class OrdersService {
       query = query.eq('status_id', filters.status_id);
     }
 
-    if (filters.status_key) {
-      query = query.eq('statuses.key', filters.status_key);
+    if (filters.status_ids && filters.status_ids.length > 0) {
+      query = query.in('status_id', filters.status_ids);
+    }
+
+    if (filters.collection_status) {
+      query = query.eq('collection_status', filters.collection_status);
+    }
+
+    if (filters.has_tracking === true) {
+      query = query.not('tracking_number', 'is', null);
+    } else if (filters.has_tracking === false) {
+      query = query.is('tracking_number', null);
+    }
+
+    if (filters.order_source) {
+      query = query.eq('order_source', filters.order_source);
+    }
+
+    if (filters.processing_status) {
+      query = query.eq('processing_status', filters.processing_status);
+    }
+
+    if (filters.is_late && filters.late_days) {
+      const lateCutoff = new Date();
+      lateCutoff.setDate(lateCutoff.getDate() - filters.late_days);
+      query = query.lt('created_at', lateCutoff.toISOString());
     }
 
     if (filters.search) {
       const searchTerm = `%${filters.search}%`;
       query = query.or(
-        `id.ilike.${searchTerm},notes.ilike.${searchTerm}`
+        `id.ilike.${searchTerm},order_number.ilike.${searchTerm},customer_name.ilike.${searchTerm},customer_phone.ilike.${searchTerm},tracking_number.ilike.${searchTerm},notes.ilike.${searchTerm}`
       );
     }
 
@@ -123,13 +161,11 @@ export class OrdersService {
       count = data.length;
     }
 
-    const { data: finalData, error: finalError, count: finalCount } = { data, error: null, count };
-
-    const total_count = finalCount || 0;
+    const total_count = count || 0;
     const page_count = Math.ceil(total_count / pagination.pageSize);
 
     return {
-      rows: (finalData || []) as OrderWithRelations[],
+      rows: (data || []) as OrderWithRelations[],
       total_count,
       page_count,
     };
@@ -141,9 +177,10 @@ export class OrdersService {
       .select(
         `
         *,
-        status:statuses(id, name_ar, name_en, color, is_default),
+        status:statuses(id, name_ar, name_en, color, is_default, key, counts_as_delivered, counts_as_return),
         country:countries(id, name_ar, currency),
-        carrier:carriers(id, name_ar),
+        city:cities(id, name_ar, name_en, shipping_cost),
+        carrier:carriers(id, name_ar, name_en, tracking_url),
         employee:employees(id, name_ar, name_en)
       `
       )
@@ -154,19 +191,19 @@ export class OrdersService {
     return data as OrderWithRelations | null;
   }
 
-  static async getOrderItems(orderId: string): Promise<any[]> {
+  static async getOrderItems(orderId: string): Promise<OrderItemWithProduct[]> {
     const { data, error } = await supabase
       .from('order_items')
       .select(
         `
         *,
-        product:products!inner(id, name_ar, sku)
+        product:products(id, name_ar, name_en, sku, price, cost, image_url, physical_stock, reserved_stock)
       `
       )
       .eq('order_id', orderId);
 
     if (error) throw error;
-    return data || [];
+    return (data || []) as OrderItemWithProduct[];
   }
 
   static async getOrderAuditLogs(orderId: string): Promise<AuditLogWithUser[]> {
@@ -179,6 +216,24 @@ export class OrdersService {
 
     if (error) throw error;
     return (data || []) as AuditLogWithUser[];
+  }
+
+  static async getOrderStatistics(businessId: string): Promise<OrderStatistics> {
+    const { data, error } = await supabase.rpc('get_order_statistics', {
+      p_business_id: businessId
+    });
+
+    if (error) {
+      console.error('Failed to get statistics:', error);
+      return {
+        today_count: 0,
+        pending_value: 0,
+        confirmation_rate: 0,
+        late_orders_count: 0
+      };
+    }
+
+    return data as OrderStatistics;
   }
 
   static async updateOrderStatus(
@@ -194,9 +249,27 @@ export class OrdersService {
       throw new Error('Order not found');
     }
 
+    const { data: newStatus } = await supabase
+      .from('statuses')
+      .select('key, counts_as_delivered')
+      .eq('id', statusId)
+      .maybeSingle();
+
+    const updateData: Record<string, unknown> = { status_id: statusId };
+
+    if (newStatus?.key === 'confirmed' || newStatus?.counts_as_delivered) {
+      updateData.confirmed_at = new Date().toISOString();
+    }
+    if (newStatus?.key === 'shipped') {
+      updateData.shipped_at = new Date().toISOString();
+    }
+    if (newStatus?.key === 'delivered') {
+      updateData.delivered_at = new Date().toISOString();
+    }
+
     const { error: updateError } = await supabase
       .from('orders')
-      .update({ status_id: statusId })
+      .update(updateData)
       .eq('id', orderId)
       .eq('business_id', businessId);
 
@@ -255,16 +328,27 @@ export class OrdersService {
     });
   }
 
-  private static extractPatchFields(order: OrderWithRelations, patch: OrderUpdatePatch): any {
-    const result: any = {};
+  private static extractPatchFields(order: OrderWithRelations, patch: OrderUpdatePatch): Record<string, unknown> {
+    const result: Record<string, unknown> = {};
 
     if (patch.revenue !== undefined) result.revenue = order.revenue;
     if (patch.cost !== undefined) result.cost = order.cost;
     if (patch.shipping_cost !== undefined) result.shipping_cost = order.shipping_cost;
+    if (patch.cod_fees !== undefined) result.cod_fees = order.cod_fees;
+    if (patch.collected_amount !== undefined) result.collected_amount = order.collected_amount;
+    if (patch.collection_status !== undefined) result.collection_status = order.collection_status;
     if (patch.notes !== undefined) result.notes = order.notes;
+    if (patch.tracking_number !== undefined) result.tracking_number = order.tracking_number;
+    if (patch.customer_name !== undefined) result.customer_name = order.customer_name;
+    if (patch.customer_phone !== undefined) result.customer_phone = order.customer_phone;
+    if (patch.customer_address !== undefined) result.customer_address = order.customer_address;
     if (patch.country_id !== undefined) {
       result.country_id = order.country_id;
       result.country_name = order.country?.name_ar || null;
+    }
+    if (patch.city_id !== undefined) {
+      result.city_id = order.city_id;
+      result.city_name = order.city?.name_ar || null;
     }
     if (patch.carrier_id !== undefined) {
       result.carrier_id = order.carrier_id;
@@ -284,44 +368,307 @@ export class OrdersService {
     statusId: string,
     userId: string
   ): Promise<void> {
-    const ordersBefore = await Promise.all(
-      orderIds.map((id) => this.getOrderById(id))
-    );
+    for (const orderId of orderIds) {
+      try {
+        await this.updateOrderStatus(businessId, orderId, statusId, userId);
+      } catch (error) {
+        console.error(`Failed to update order ${orderId}:`, error);
+      }
+    }
+  }
+
+  static async bulkAssignCarrier(
+    businessId: string,
+    orderIds: string[],
+    carrierId: string,
+    userId: string
+  ): Promise<BulkUpdateResult> {
+    let success = 0;
+    const errors: string[] = [];
 
     for (const orderId of orderIds) {
-      const orderBefore = ordersBefore.find((o) => o?.id === orderId);
-
-      if (!orderBefore) continue;
-
-      const { error: updateError } = await supabase
-        .from('orders')
-        .update({ status_id: statusId })
-        .eq('id', orderId)
-        .eq('business_id', businessId);
-
-      if (updateError) {
-        console.error(`Failed to update order ${orderId}:`, updateError);
-        continue;
+      try {
+        await this.updateOrderFields(businessId, orderId, { carrier_id: carrierId }, userId);
+        success++;
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        errors.push(`فشل تحديث الطلب ${orderId.substring(0, 8)}: ${message}`);
       }
+    }
 
-      const orderAfter = await this.getOrderById(orderId);
+    return { success, failed: orderIds.length - success, errors };
+  }
 
-      await supabase.from('audit_logs').insert({
+  static async bulkAssignEmployee(
+    businessId: string,
+    orderIds: string[],
+    employeeId: string,
+    userId: string
+  ): Promise<BulkUpdateResult> {
+    let success = 0;
+    const errors: string[] = [];
+
+    for (const orderId of orderIds) {
+      try {
+        await this.updateOrderFields(businessId, orderId, { employee_id: employeeId }, userId);
+        success++;
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        errors.push(`فشل تحديث الطلب ${orderId.substring(0, 8)}: ${message}`);
+      }
+    }
+
+    return { success, failed: orderIds.length - success, errors };
+  }
+
+  static async bulkUpdateTrackingNumbers(
+    businessId: string,
+    updates: BulkTrackingUpdate[],
+    userId: string
+  ): Promise<BulkUpdateResult> {
+    let success = 0;
+    const errors: string[] = [];
+
+    for (const update of updates) {
+      try {
+        let orderId = update.order_id;
+
+        if (!orderId && update.order_number) {
+          const { data } = await supabase
+            .from('orders')
+            .select('id')
+            .eq('business_id', businessId)
+            .eq('order_number', update.order_number)
+            .maybeSingle();
+
+          orderId = data?.id;
+        }
+
+        if (!orderId) {
+          errors.push(`الطلب "${update.order_number || update.order_id}" غير موجود`);
+          continue;
+        }
+
+        await this.updateOrderFields(
+          businessId,
+          orderId,
+          { tracking_number: update.tracking_number },
+          userId
+        );
+        success++;
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        errors.push(`فشل تحديث رقم التتبع: ${message}`);
+      }
+    }
+
+    return { success, failed: updates.length - success, errors };
+  }
+
+  static async bulkUpdateDeliveryStatus(
+    businessId: string,
+    updates: BulkDeliveryUpdate[],
+    userId: string
+  ): Promise<BulkUpdateResult> {
+    let success = 0;
+    const errors: string[] = [];
+
+    const { data: statuses } = await supabase
+      .from('statuses')
+      .select('id, key')
+      .eq('business_id', businessId);
+
+    const deliveredStatus = statuses?.find(s => s.key === 'delivered');
+    const returnedStatus = statuses?.find(s => s.key === 'returned' || s.key === 'rto');
+
+    for (const update of updates) {
+      try {
+        let orderId = update.order_id;
+
+        if (!orderId && update.tracking_number) {
+          const { data } = await supabase
+            .from('orders')
+            .select('id')
+            .eq('business_id', businessId)
+            .eq('tracking_number', update.tracking_number)
+            .maybeSingle();
+
+          orderId = data?.id;
+        }
+
+        if (!orderId) {
+          errors.push(`الطلب برقم التتبع "${update.tracking_number}" غير موجود`);
+          continue;
+        }
+
+        const patch: OrderUpdatePatch = {};
+
+        if (update.status === 'delivered') {
+          if (deliveredStatus) {
+            await this.updateOrderStatus(businessId, orderId, deliveredStatus.id, userId);
+          }
+          if (update.collected_amount !== undefined) {
+            patch.collected_amount = update.collected_amount;
+            patch.collection_status = 'collected';
+          }
+        } else if (update.status === 'returned') {
+          if (returnedStatus) {
+            await this.updateOrderStatus(businessId, orderId, returnedStatus.id, userId);
+          }
+          if (update.return_reason) {
+            patch.return_reason = update.return_reason;
+          }
+          patch.collection_status = 'failed';
+        }
+
+        if (Object.keys(patch).length > 0) {
+          await this.updateOrderFields(businessId, orderId, patch, userId);
+        }
+
+        success++;
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        errors.push(`فشل تحديث حالة التسليم: ${message}`);
+      }
+    }
+
+    return { success, failed: updates.length - success, errors };
+  }
+
+  static async lockOrder(
+    businessId: string,
+    orderId: string,
+    employeeId: string
+  ): Promise<{ success: boolean; error?: string; expires_at?: string }> {
+    const { data, error } = await supabase.rpc('lock_order_for_processing', {
+      p_business_id: businessId,
+      p_order_id: orderId,
+      p_employee_id: employeeId,
+      p_duration_minutes: 10
+    });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    if (!data.success) {
+      return { success: false, error: data.error };
+    }
+
+    return { success: true, expires_at: data.expires_at };
+  }
+
+  static async unlockOrder(orderId: string, employeeId?: string): Promise<void> {
+    await supabase.rpc('unlock_order', {
+      p_order_id: orderId,
+      p_employee_id: employeeId || null
+    });
+  }
+
+  static async getUnlockedOrders(
+    businessId: string,
+    filters: OrderFilters = {}
+  ): Promise<OrderWithRelations[]> {
+    const response = await this.listOrders(
+      businessId,
+      { ...filters, processing_status: 'pending' },
+      { page: 1, pageSize: 100 },
+      { field: 'created_at', direction: 'asc' }
+    );
+
+    return response.rows;
+  }
+
+  static async createOrder(
+    businessId: string,
+    input: OrderCreateInput,
+    userId: string
+  ): Promise<Order> {
+    await this.ensureCanAddOrders(businessId, 1);
+
+    const timestamp = Date.now();
+    const random = Math.random().toString(36).substring(2, 6).toUpperCase();
+
+    let totalRevenue = 0;
+    let totalCost = 0;
+
+    for (const item of input.items) {
+      const { data: product } = await supabase
+        .from('products')
+        .select('cost')
+        .eq('id', item.product_id)
+        .maybeSingle();
+
+      totalRevenue += item.unit_price * item.quantity;
+      totalCost += (product?.cost || 0) * item.quantity;
+    }
+
+    const { data: order, error: orderError } = await supabase
+      .from('orders')
+      .insert({
         business_id: businessId,
-        user_id: userId,
-        entity_type: 'orders',
-        entity_id: orderId,
-        action: 'bulk_status_change',
-        before: {
-          status_id: orderBefore.status_id,
-          status_label: orderBefore.status?.name_ar,
-        },
-        after: {
-          status_id: orderAfter?.status_id,
-          status_label: orderAfter?.status?.name_ar,
-        },
+        order_number: `ORD-${timestamp}-${random}`,
+        order_date: input.order_date,
+        customer_name: input.customer_name,
+        customer_phone: input.customer_phone || null,
+        customer_address: input.customer_address || null,
+        country_id: input.country_id || null,
+        city_id: input.city_id || null,
+        carrier_id: input.carrier_id || null,
+        employee_id: input.employee_id || null,
+        status_id: input.status_id || null,
+        order_source: input.order_source || null,
+        notes: input.notes || null,
+        revenue: totalRevenue,
+        cost: totalCost,
+        shipping_cost: 0,
+        cod_fees: 0,
+        created_by: userId,
+      })
+      .select()
+      .single();
+
+    if (orderError) throw orderError;
+
+    for (const item of input.items) {
+      await supabase.from('order_items').insert({
+        order_id: order.id,
+        product_id: item.product_id,
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+        total_price: item.unit_price * item.quantity,
       });
     }
+
+    return order as Order;
+  }
+
+  static async duplicateOrder(
+    businessId: string,
+    orderId: string,
+    userId: string
+  ): Promise<Order> {
+    const original = await this.getOrderById(orderId);
+    if (!original) throw new Error('Order not found');
+
+    const items = await this.getOrderItems(orderId);
+
+    return this.createOrder(businessId, {
+      order_date: new Date().toISOString().split('T')[0],
+      customer_name: original.customer_name || '',
+      customer_phone: original.customer_phone || undefined,
+      customer_address: original.customer_address || undefined,
+      country_id: original.country_id || undefined,
+      city_id: original.city_id || undefined,
+      carrier_id: original.carrier_id || undefined,
+      order_source: original.order_source || undefined,
+      notes: `نسخة من الطلب #${original.order_number}`,
+      items: items.map(item => ({
+        product_id: item.product_id,
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+      })),
+    }, userId);
   }
 
   static async exportOrdersCsv(
@@ -338,28 +685,42 @@ export class OrdersService {
     const headers = [
       'رقم الطلب',
       'التاريخ',
-      'الحالة',
+      'اسم العميل',
+      'رقم الهاتف',
       'الدولة',
+      'المدينة',
+      'العنوان',
+      'الحالة',
       'شركة الشحن',
+      'رقم التتبع',
       'الموظف',
       'الإيراد',
       'التكلفة',
       'الشحن',
+      'رسوم COD',
+      'المبلغ المحصل',
       'الربح الصافي',
       'ملاحظات',
     ];
 
     const rows = response.rows.map((order) => [
-      order.id.substring(0, 8),
+      order.order_number || order.id.substring(0, 8),
       new Date(order.order_date).toLocaleDateString('ar-EG'),
-      order.status?.label_ar || '-',
-      order.country?.name_ar || '-',
-      order.carrier?.name_ar || '-',
-      order.employee?.name_ar || '-',
-      order.revenue.toFixed(2),
-      order.cost.toFixed(2),
-      order.shipping_cost.toFixed(2),
-      order.profit.toFixed(2),
+      order.customer_name || '',
+      order.customer_phone || '',
+      order.country?.name_ar || '',
+      order.city?.name_ar || '',
+      order.customer_address || '',
+      order.status?.name_ar || '',
+      order.carrier?.name_ar || '',
+      order.tracking_number || '',
+      order.employee?.name_ar || '',
+      order.revenue?.toFixed(2) || '0',
+      order.cost?.toFixed(2) || '0',
+      order.shipping_cost?.toFixed(2) || '0',
+      order.cod_fees?.toFixed(2) || '0',
+      order.collected_amount?.toFixed(2) || '',
+      (order.profit || (order.revenue - order.cost - order.shipping_cost - (order.cod_fees || 0))).toFixed(2),
       order.notes || '',
     ]);
 
@@ -367,6 +728,68 @@ export class OrdersService {
       '\ufeff' + headers.join(','),
       ...rows.map((row) =>
         row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')
+      ),
+    ].join('\n');
+
+    return csvContent;
+  }
+
+  static async exportForCarrier(
+    businessId: string,
+    orderIds: string[],
+    carrierFormat: 'aramex' | 'smsa' | 'dhl' | 'generic' = 'generic'
+  ): Promise<string> {
+    const orders: OrderWithRelations[] = [];
+
+    for (const id of orderIds) {
+      const order = await this.getOrderById(id);
+      if (order) orders.push(order);
+    }
+
+    let headers: string[];
+    let mapRow: (order: OrderWithRelations) => string[];
+
+    switch (carrierFormat) {
+      case 'aramex':
+        headers = ['Order ID', 'Consignee Name', 'Phone', 'Address', 'City', 'Country', 'COD Amount', 'Weight'];
+        mapRow = (order) => [
+          order.order_number || order.id.substring(0, 8),
+          order.customer_name || '',
+          order.customer_phone || '',
+          order.customer_address || '',
+          order.city?.name_ar || '',
+          order.country?.name_ar || '',
+          order.revenue?.toString() || '0',
+          '0.5',
+        ];
+        break;
+      case 'smsa':
+        headers = ['Reference', 'Name', 'Mobile', 'Address Line 1', 'City', 'COD'];
+        mapRow = (order) => [
+          order.order_number || order.id.substring(0, 8),
+          order.customer_name || '',
+          order.customer_phone || '',
+          order.customer_address || '',
+          order.city?.name_ar || '',
+          order.revenue?.toString() || '0',
+        ];
+        break;
+      default:
+        headers = ['Order Number', 'Customer Name', 'Phone', 'Address', 'City', 'COD Amount'];
+        mapRow = (order) => [
+          order.order_number || order.id.substring(0, 8),
+          order.customer_name || '',
+          order.customer_phone || '',
+          order.customer_address || '',
+          order.city?.name_ar || '',
+          order.revenue?.toString() || '0',
+        ];
+    }
+
+    const csvContent = [
+      '\ufeff' + headers.join(','),
+      ...orders.map((order) =>
+        mapRow(order).map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')
       ),
     ].join('\n');
 
@@ -481,6 +904,7 @@ export class OrdersService {
           revenue: row.price * row.quantity,
           cost: productCost,
           shipping_cost: 0,
+          cod_fees: 0,
           notes: row.notes || null,
         };
 
@@ -513,13 +937,14 @@ export class OrdersService {
         }
 
         success++;
-      } catch (err: any) {
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'خطأ غير معروف';
         insertErrors.push({
           rowNumber: row.rowNumber,
           errors: [{
             rowNumber: row.rowNumber,
             column: 'System',
-            message: err.message || 'خطأ غير معروف',
+            message,
           }],
         });
       }
@@ -562,6 +987,7 @@ export class OrdersService {
       customer_phone?: string;
       customer_address?: string;
       country_id?: string;
+      city_id?: string;
       carrier_id?: string;
       employee_id?: string;
       status_id?: string;
@@ -586,12 +1012,14 @@ export class OrdersService {
         customer_phone: orderData.customer_phone || null,
         customer_address: orderData.customer_address || null,
         country_id: orderData.country_id || null,
+        city_id: orderData.city_id || null,
         carrier_id: orderData.carrier_id || null,
         employee_id: orderData.employee_id || null,
         status_id: orderData.status_id || null,
         revenue: orderData.revenue || 0,
         cost: orderData.cost || 0,
         shipping_cost: orderData.shipping_cost || 0,
+        cod_fees: 0,
         notes: orderData.notes || null,
       })
       .select()

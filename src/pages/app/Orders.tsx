@@ -1,19 +1,19 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { PageHeader } from '@/components/common/PageHeader';
-import { Button, Card, CardContent } from '@/components/ui';
+import { Button, Card, CardContent, Input } from '@/components/ui';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { OrdersService } from '@/services/orders.service';
 import { useOrdersList } from '@/hooks/useOrdersList';
-import { OrdersToolbar } from '@/components/orders/OrdersToolbar';
+import { OrdersStatsBar } from '@/components/orders/OrdersStatsBar';
 import { OrdersTable } from '@/components/orders/OrdersTable';
 import { FiltersPanel } from '@/components/orders/FiltersPanel';
 import { BulkActionsBar } from '@/components/orders/BulkActionsBar';
 import { OrderDetailsDrawer } from '@/components/orders/OrderDetailsDrawer';
 import { ImportModal } from '@/components/entity/ImportModal';
 import type { OrderFilters } from '@/types/domain';
-import { FileText, X } from 'lucide-react';
+import { FileText, X, Search, Filter, Download, Upload, RefreshCw, Loader2 } from 'lucide-react';
 import { generateOrderTemplate } from '@/utils/order-import';
 import { parseImportFile } from '@/utils/file-parser';
 import type { ImportResult } from '@/services/orders.service';
@@ -48,7 +48,6 @@ export function Orders() {
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [hasAppliedFilters, setHasAppliedFilters] = useState(false);
-
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
   useEffect(() => {
@@ -138,7 +137,7 @@ export function Orders() {
       }
 
       return result;
-    } catch (error: any) {
+    } catch (error: unknown) {
       throw error;
     }
   };
@@ -160,6 +159,66 @@ export function Orders() {
     }
   };
 
+  const handleBulkAssignCarrier = async (carrierId: string) => {
+    if (!currentBusiness || !user) return;
+
+    try {
+      await OrdersService.bulkAssignCarrier(
+        currentBusiness.id,
+        selectedOrderIds,
+        carrierId,
+        user.id
+      );
+      setSelectedOrderIds([]);
+      loadOrders();
+    } catch (error) {
+      console.error('Failed to assign carrier:', error);
+    }
+  };
+
+  const handleBulkAssignEmployee = async (employeeId: string) => {
+    if (!currentBusiness || !user) return;
+
+    try {
+      await OrdersService.bulkAssignEmployee(
+        currentBusiness.id,
+        selectedOrderIds,
+        employeeId,
+        user.id
+      );
+      setSelectedOrderIds([]);
+      loadOrders();
+    } catch (error) {
+      console.error('Failed to assign employee:', error);
+    }
+  };
+
+  const handleExportSelected = async (format: 'csv' | 'carrier') => {
+    if (!currentBusiness) return;
+
+    try {
+      let csvContent: string;
+
+      if (format === 'csv') {
+        csvContent = await OrdersService.exportOrdersCsv(currentBusiness.id, filters);
+      } else {
+        csvContent = await OrdersService.exportForCarrier(currentBusiness.id, selectedOrderIds, 'generic');
+      }
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `orders_${new Date().toISOString().split('T')[0]}.csv`;
+      link.click();
+    } catch (error) {
+      console.error('Failed to export:', error);
+    }
+  };
+
+  const handlePrintSelected = async () => {
+    alert('ميزة الطباعة قيد التطوير');
+  };
+
   const handleStatusChange = async (orderId: string, statusId: string) => {
     if (!currentBusiness || !user) return;
 
@@ -168,6 +227,17 @@ export function Orders() {
       loadOrders();
     } catch (error) {
       console.error('Failed to update status:', error);
+    }
+  };
+
+  const handleDuplicateOrder = async (orderId: string) => {
+    if (!currentBusiness || !user) return;
+
+    try {
+      await OrdersService.duplicateOrder(currentBusiness.id, orderId, user.id);
+      loadOrders();
+    } catch (error) {
+      console.error('Failed to duplicate order:', error);
     }
   };
 
@@ -187,27 +257,58 @@ export function Orders() {
     }
   };
 
+  const handleLateOrdersClick = () => {
+    setFilters({
+      ...filters,
+      is_late: true,
+      late_days: 5,
+    });
+    setCurrentPage(1);
+  };
+
   const clearAppliedFilters = () => {
     setFilters({});
     setHasAppliedFilters(false);
     setSearchParams({});
   };
 
+  const getActiveFiltersCount = () => {
+    let count = 0;
+    if (filters.date_from || filters.date_to) count++;
+    if (filters.status_id) count++;
+    if (filters.country_id) count++;
+    if (filters.city_id) count++;
+    if (filters.carrier_id) count++;
+    if (filters.employee_id) count++;
+    if (filters.product_id) count++;
+    if (filters.collection_status) count++;
+    if (filters.order_source) count++;
+    if (filters.has_tracking !== undefined) count++;
+    if (filters.is_late) count++;
+    return count;
+  };
+
   if (!currentBusiness) {
     return (
-      <>
-        <div className="text-center py-12">
-          <p className="text-zinc-600">لم يتم تحديد وورك سبيس</p>
-        </div>
-      </>
+      <div className="text-center py-12">
+        <p className="text-zinc-600">لم يتم تحديد وورك سبيس</p>
+      </div>
     );
   }
+
+  const currency = currentBusiness?.settings?.currency || 'ر.س';
 
   return (
     <>
       <PageHeader
         title="الطلبات"
         description="إدارة ومتابعة جميع الطلبات"
+      />
+
+      <OrdersStatsBar
+        businessId={currentBusiness.id}
+        currency={currency}
+        onLateOrdersClick={handleLateOrdersClick}
       />
 
       {hasAppliedFilters && (
@@ -226,23 +327,62 @@ export function Orders() {
         </div>
       )}
 
-      <OrdersToolbar
-        searchTerm={searchTerm}
-        onSearchChange={setSearchTerm}
-        onFiltersClick={() => setIsFiltersOpen(true)}
-        onExportCsv={handleExportCsv}
-        onImportCsv={() => setIsImportModalOpen(true)}
-      />
-
-      {isLoading ? (
-        <Card>
-          <CardContent>
-            <div className="space-y-4">
-              {[...Array(5)].map((_, i) => (
-                <div key={i} className="h-16 bg-zinc-100 animate-pulse rounded-lg" />
-              ))}
+      <Card className="mb-6">
+        <div className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex-1 w-full sm:max-w-md">
+            <div className="relative">
+              <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
+              <Input
+                placeholder="ابحث عن طلب..."
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="pr-10"
+              />
             </div>
-          </CardContent>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button
+              variant="outline"
+              onClick={() => setIsFiltersOpen(true)}
+              className="relative"
+            >
+              <Filter className="h-4 w-4 ml-2" />
+              فلاتر
+              {getActiveFiltersCount() > 0 && (
+                <span className="absolute -top-1.5 -left-1.5 bg-blue-600 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
+                  {getActiveFiltersCount()}
+                </span>
+              )}
+            </Button>
+
+            <Button variant="outline" onClick={handleExportCsv}>
+              <Download className="h-4 w-4 ml-2" />
+              تصدير
+            </Button>
+
+            <Button variant="outline" onClick={() => setIsImportModalOpen(true)}>
+              <Upload className="h-4 w-4 ml-2" />
+              استيراد
+            </Button>
+
+            <Button variant="outline" onClick={loadOrders} disabled={isLoading}>
+              <RefreshCw className={`h-4 w-4 ml-2 ${isLoading ? 'animate-spin' : ''}`} />
+              تحديث
+            </Button>
+          </div>
+        </div>
+      </Card>
+
+      {isLoading && orders.length === 0 ? (
+        <Card className="p-12">
+          <div className="flex flex-col items-center justify-center">
+            <Loader2 className="h-8 w-8 text-zinc-400 animate-spin mb-4" />
+            <p className="text-zinc-500">جاري تحميل الطلبات...</p>
+          </div>
         </Card>
       ) : orders.length === 0 ? (
         <Card>
@@ -264,6 +404,7 @@ export function Orders() {
             setSelectedOrderId(id);
             setIsDetailsOpen(true);
           }}
+          onDuplicate={handleDuplicateOrder}
           currentPage={currentPage}
           pageSize={pageSize}
           totalCount={totalCount}
@@ -273,6 +414,7 @@ export function Orders() {
             setPageSize(size);
             setCurrentPage(1);
           }}
+          isAdmin={true}
         />
       )}
 
@@ -280,21 +422,34 @@ export function Orders() {
         <BulkActionsBar
           selectedCount={selectedOrderIds.length}
           statuses={statuses}
+          carriers={carriers}
+          employees={employees}
           onUpdateStatus={handleBulkUpdateStatus}
+          onAssignCarrier={handleBulkAssignCarrier}
+          onAssignEmployee={handleBulkAssignEmployee}
+          onExportSelected={handleExportSelected}
+          onPrintSelected={handlePrintSelected}
           onClearSelection={() => setSelectedOrderIds([])}
         />
       )}
 
       <FiltersPanel
         filters={filters}
-        onFiltersChange={setFilters}
-        onClear={() => setFilters({})}
+        onFiltersChange={(newFilters) => {
+          setFilters(newFilters);
+          setCurrentPage(1);
+        }}
+        onClear={() => {
+          setFilters({});
+          setCurrentPage(1);
+        }}
         statuses={statuses}
         countries={countries}
         carriers={carriers}
         employees={employees}
         isOpen={isFiltersOpen}
         onClose={() => setIsFiltersOpen(false)}
+        businessId={currentBusiness.id}
       />
 
       {selectedOrderId && (
@@ -308,6 +463,7 @@ export function Orders() {
             setSelectedOrderId(null);
           }}
           onUpdate={loadOrders}
+          isAdmin={true}
         />
       )}
 

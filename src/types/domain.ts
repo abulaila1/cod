@@ -22,7 +22,20 @@ export interface Carrier {
   id: string;
   business_id: string;
   name_ar: string;
+  name_en?: string | null;
+  tracking_url?: string | null;
   active: boolean;
+  created_at: string;
+}
+
+export interface City {
+  id: string;
+  business_id: string;
+  country_id: string;
+  name_ar: string;
+  name_en?: string | null;
+  shipping_cost: number;
+  is_active: boolean;
   created_at: string;
 }
 
@@ -72,14 +85,27 @@ export interface Order {
   customer_phone: string | null;
   customer_address: string | null;
   country_id: string;
+  city_id: string | null;
   carrier_id: string;
   employee_id: string;
   status_id: string;
   revenue: number;
   cost: number;
   shipping_cost: number;
+  cod_fees: number;
+  collected_amount: number | null;
+  collection_status: 'pending' | 'collected' | 'partial' | 'failed';
   profit: number;
   notes: string | null;
+  tracking_number: string | null;
+  order_source: string | null;
+  callback_date: string | null;
+  cancellation_reason: string | null;
+  return_reason: string | null;
+  confirmed_at: string | null;
+  shipped_at: string | null;
+  delivered_at: string | null;
+  processing_status: 'pending' | 'processing' | 'completed';
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -128,20 +154,52 @@ export interface UpdateStatusInput {
 export interface OrderWithRelations extends Order {
   status: Status | null;
   country: Country | null;
+  city: City | null;
   carrier: Carrier | null;
   employee: Employee | null;
+  lock?: OrderLock | null;
+  items?: OrderItemWithProduct[];
+}
+
+export interface OrderItemWithProduct extends OrderItem {
+  product: Product | null;
+}
+
+export interface OrderLock {
+  id: string;
+  business_id: string;
+  order_id: string;
+  locked_by: string;
+  locked_at: string;
+  expires_at: string;
+  employee?: Employee | null;
+}
+
+export interface OrderStatistics {
+  today_count: number;
+  pending_value: number;
+  confirmation_rate: number;
+  late_orders_count: number;
 }
 
 export interface OrderFilters {
   date_from?: string;
   date_to?: string;
   country_id?: string;
+  city_id?: string;
   carrier_id?: string;
   employee_id?: string;
   status_id?: string;
+  status_ids?: string[];
   status_key?: string;
   product_id?: string;
   search?: string;
+  collection_status?: string;
+  has_tracking?: boolean;
+  is_late?: boolean;
+  late_days?: number;
+  order_source?: string;
+  processing_status?: string;
 }
 
 export interface OrderPagination {
@@ -164,10 +222,57 @@ export interface OrderUpdatePatch {
   revenue?: number;
   cost?: number;
   shipping_cost?: number;
+  cod_fees?: number;
+  collected_amount?: number;
+  collection_status?: 'pending' | 'collected' | 'partial' | 'failed';
   notes?: string;
   country_id?: string;
+  city_id?: string;
   carrier_id?: string;
   employee_id?: string;
+  tracking_number?: string;
+  order_source?: string;
+  callback_date?: string;
+  cancellation_reason?: string;
+  return_reason?: string;
+  customer_name?: string;
+  customer_phone?: string;
+  customer_address?: string;
+}
+
+export interface OrderCreateInput {
+  order_date: string;
+  customer_name: string;
+  customer_phone?: string;
+  customer_address?: string;
+  country_id?: string;
+  city_id?: string;
+  carrier_id?: string;
+  employee_id?: string;
+  status_id?: string;
+  order_source?: string;
+  notes?: string;
+  items: OrderItemInput[];
+}
+
+export interface OrderItemInput {
+  product_id: string;
+  quantity: number;
+  unit_price: number;
+}
+
+export interface BulkTrackingUpdate {
+  order_id?: string;
+  order_number?: string;
+  tracking_number: string;
+}
+
+export interface BulkDeliveryUpdate {
+  tracking_number?: string;
+  order_id?: string;
+  status: 'delivered' | 'returned';
+  collected_amount?: number;
+  return_reason?: string;
 }
 
 export interface AuditLogWithUser extends AuditLog {
