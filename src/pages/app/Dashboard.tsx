@@ -41,7 +41,10 @@ export function Dashboard() {
   const [data, setData] = useState<AnalyticsData | null>(null);
 
   const loadAnalytics = useCallback(async () => {
-    if (!currentBusiness?.id) return;
+    if (!currentBusiness?.id) {
+      setIsLoading(false);
+      return;
+    }
 
     setIsLoading(true);
     try {
