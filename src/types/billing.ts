@@ -1,4 +1,4 @@
-export type PlanType = 'starter' | 'pro' | 'elite' | 'enterprise';
+export type PlanType = 'free' | 'starter' | 'pro' | 'elite' | 'enterprise';
 export type BillingStatus = 'inactive' | 'active' | 'trial';
 export type ManualPaymentStatus = 'none' | 'pending' | 'verified' | 'rejected';
 
@@ -32,6 +32,25 @@ export interface PlanDetails {
 }
 
 export const PLAN_CONFIG: Record<PlanType, Omit<PlanDetails, 'key'>> = {
+  free: {
+    name: 'Free',
+    nameAr: 'المجاني',
+    price: 0,
+    limit: 50,
+    features: [
+      'Up to 50 orders/month',
+      'Basic dashboard',
+      'Community support',
+      'Limited features'
+    ],
+    featuresAr: [
+      'حتى 50 طلب شهرياً',
+      'لوحة تحكم أساسية',
+      'دعم المجتمع',
+      'ميزات محدودة'
+    ],
+    stripeLink: '',
+  },
   starter: {
     name: 'Starter',
     nameAr: 'المبتدئ',

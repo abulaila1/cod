@@ -23,12 +23,14 @@ import {
   ArrowRight,
   Wallet,
   Smartphone,
+  Gift,
 } from 'lucide-react';
 import type { Billing, PlanType, PlanDetails } from '@/types/billing';
 import type { UsageStatus } from '@/services/usage.service';
 import { PLAN_CONFIG } from '@/types/billing';
 
 const PLANS: PlanDetails[] = [
+  { key: 'free', ...PLAN_CONFIG.free },
   { key: 'starter', ...PLAN_CONFIG.starter },
   { key: 'pro', ...PLAN_CONFIG.pro },
   { key: 'elite', ...PLAN_CONFIG.elite },
@@ -36,6 +38,7 @@ const PLANS: PlanDetails[] = [
 ];
 
 const PLAN_ICONS: Record<PlanType, React.ReactNode> = {
+  free: <Gift className="h-6 w-6" />,
   starter: <Rocket className="h-6 w-6" />,
   pro: <Zap className="h-6 w-6" />,
   elite: <Crown className="h-6 w-6" />,
@@ -270,28 +273,34 @@ export function Billing() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 mb-12">
         {PLANS.map((plan) => {
           const { original, final } = getPrice(plan);
           const isCurrentPlan = billing?.plan === plan.key;
           const isPro = plan.popular;
+          const isFree = plan.key === 'free';
 
           return (
             <Card
               key={plan.key}
               className={`relative overflow-hidden transition-all duration-300 hover:shadow-xl ${
                 isPro ? 'ring-2 ring-emerald-500 scale-[1.02]' : ''
-              } ${isCurrentPlan ? 'bg-emerald-50' : ''}`}
+              } ${isFree ? 'ring-2 ring-blue-400' : ''} ${isCurrentPlan ? 'bg-emerald-50' : ''}`}
             >
               {isPro && (
                 <div className="absolute top-0 left-0 right-0 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-center py-2 text-sm font-semibold">
                   الأكثر شعبية
                 </div>
               )}
-              <CardContent className={isPro ? 'pt-12' : ''}>
+              {isFree && (
+                <div className="absolute top-0 left-0 right-0 bg-gradient-to-r from-blue-500 to-cyan-500 text-white text-center py-2 text-sm font-semibold">
+                  ابدأ مجاناً
+                </div>
+              )}
+              <CardContent className={isPro || isFree ? 'pt-12' : ''}>
                 <div className="text-center mb-6">
                   <div className={`inline-flex p-4 rounded-2xl mb-4 ${
-                    isPro ? 'bg-emerald-100 text-emerald-600' : 'bg-zinc-100 text-zinc-600'
+                    isPro ? 'bg-emerald-100 text-emerald-600' : isFree ? 'bg-blue-100 text-blue-600' : 'bg-zinc-100 text-zinc-600'
                   }`}>
                     {PLAN_ICONS[plan.key]}
                   </div>
@@ -300,17 +309,25 @@ export function Billing() {
                 </div>
 
                 <div className="text-center mb-6">
-                  {hasDiscount && (
-                    <div className="text-zinc-400 line-through text-lg mb-1">${original}</div>
-                  )}
-                  <div className="flex items-baseline justify-center gap-1">
-                    <span className={`text-4xl font-bold ${isPro ? 'text-emerald-600' : 'text-zinc-900'}`}>
-                      ${final}
-                    </span>
-                    <span className="text-zinc-500 text-sm">/ مدى الحياة</span>
-                  </div>
-                  {hasDiscount && (
-                    <Badge variant="success" className="mt-2">وفر ${original - final}</Badge>
+                  {isFree ? (
+                    <div className="flex items-baseline justify-center gap-1">
+                      <span className="text-4xl font-bold text-blue-600">مجاني</span>
+                    </div>
+                  ) : (
+                    <>
+                      {hasDiscount && (
+                        <div className="text-zinc-400 line-through text-lg mb-1">${original}</div>
+                      )}
+                      <div className="flex items-baseline justify-center gap-1">
+                        <span className={`text-4xl font-bold ${isPro ? 'text-emerald-600' : 'text-zinc-900'}`}>
+                          ${final}
+                        </span>
+                        <span className="text-zinc-500 text-sm">/ مدى الحياة</span>
+                      </div>
+                      {hasDiscount && (
+                        <Badge variant="success" className="mt-2">وفر ${original - final}</Badge>
+                      )}
+                    </>
                   )}
                 </div>
 
@@ -318,14 +335,14 @@ export function Billing() {
                   {plan.featuresAr.map((feature, index) => (
                     <div key={index} className="flex items-start gap-3">
                       <Check className={`h-5 w-5 flex-shrink-0 mt-0.5 ${
-                        isPro ? 'text-emerald-500' : 'text-zinc-400'
+                        isPro ? 'text-emerald-500' : isFree ? 'text-blue-500' : 'text-zinc-400'
                       }`} />
                       <span className="text-sm text-zinc-700">{feature}</span>
                     </div>
                   ))}
                 </div>
 
-                {!isCurrentPlan && (
+                {!isCurrentPlan && !isFree && (
                   <Button
                     variant="primary"
                     className={`w-full ${
@@ -337,6 +354,15 @@ export function Billing() {
                   >
                     اشترك الآن
                   </Button>
+                )}
+
+                {!isCurrentPlan && isFree && (
+                  <div className="text-center py-3 bg-blue-100 rounded-xl">
+                    <span className="text-blue-700 font-semibold flex items-center justify-center gap-2">
+                      <CheckCircle className="h-5 w-5" />
+                      الخطة الافتراضية
+                    </span>
+                  </div>
                 )}
 
                 {isCurrentPlan && (
