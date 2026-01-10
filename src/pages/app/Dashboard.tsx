@@ -37,6 +37,7 @@ interface AnalyticsData {
 export function Dashboard() {
   const { currentBusiness, formatCurrency } = useBusiness();
   const [period, setPeriod] = useState('last30days');
+  const [customRange, setCustomRange] = useState<{ from: string; to: string } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [data, setData] = useState<AnalyticsData | null>(null);
 
@@ -48,8 +49,35 @@ export function Dashboard() {
 
     setIsLoading(true);
     try {
-      const dateRange = AnalyticsService.getDateRange(period);
-      const prevDateRange = AnalyticsService.getPreviousPeriodRange(period);
+      const dateRange = period === 'custom' && customRange
+        ? customRange
+        : AnalyticsService.getDateRange(period);
+
+      let prevDateRange;
+      if (period === 'custom' && customRange) {
+        const currentFrom = new Date(customRange.from);
+        const currentTo = new Date(customRange.to);
+        const daysDiff = Math.ceil((currentTo.getTime() - currentFrom.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+
+        const prevTo = new Date(currentFrom);
+        prevTo.setDate(prevTo.getDate() - 1);
+        const prevFrom = new Date(prevTo);
+        prevFrom.setDate(prevFrom.getDate() - daysDiff + 1);
+
+        const formatDate = (date: Date) => {
+          const year = date.getFullYear();
+          const month = String(date.getMonth() + 1).padStart(2, '0');
+          const day = String(date.getDate()).padStart(2, '0');
+          return `${year}-${month}-${day}`;
+        };
+
+        prevDateRange = {
+          from: formatDate(prevFrom),
+          to: formatDate(prevTo)
+        };
+      } else {
+        prevDateRange = AnalyticsService.getPreviousPeriodRange(period);
+      }
 
       const [stats, previousStats, dailyData, topProducts, carriers, recentOrders, statusBreakdown] =
         await Promise.all([
@@ -68,7 +96,7 @@ export function Dashboard() {
     } finally {
       setIsLoading(false);
     }
-  }, [currentBusiness?.id, period]);
+  }, [currentBusiness?.id, period, customRange]);
 
   useEffect(() => {
     loadAnalytics();
@@ -127,7 +155,12 @@ export function Dashboard() {
             مرحباً بك في {currentBusiness?.name || 'لوحة التحكم'}
           </p>
         </div>
-        <PeriodSelector value={period} onChange={setPeriod} />
+        <PeriodSelector
+          value={period}
+          onChange={setPeriod}
+          customRange={customRange}
+          onCustomRangeChange={setCustomRange}
+        />
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

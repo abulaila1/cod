@@ -143,8 +143,8 @@ export class AnalyticsService {
     prevFrom.setDate(prevFrom.getDate() - daysDiff + 1);
 
     return {
-      from: prevFrom.toISOString().split('T')[0],
-      to: prevTo.toISOString().split('T')[0]
+      from: this.formatDate(prevFrom),
+      to: this.formatDate(prevTo)
     };
   }
 
