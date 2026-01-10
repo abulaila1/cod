@@ -356,6 +356,8 @@ export function Reports() {
               collection_rate: 0,
             }}
             isLoading={isLoading}
+            dateFrom={dateFrom}
+            dateTo={dateTo}
           />
         )}
         {activeTab === 'products' && (

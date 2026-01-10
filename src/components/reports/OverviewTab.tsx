@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { Card } from '@/components/ui/Card';
 import {
@@ -10,16 +11,47 @@ import {
   CheckCircle,
   XCircle,
   Activity,
+  Target,
 } from 'lucide-react';
 import type { AdvancedReportSummary } from '@/types/reports';
+import { AdvertisingService } from '@/services/advertising.service';
+import type { CampaignStats } from '@/types/advertising';
 
 interface OverviewTabProps {
   summary: AdvancedReportSummary;
   isLoading: boolean;
+  dateFrom?: string;
+  dateTo?: string;
 }
 
-export function OverviewTab({ summary, isLoading }: OverviewTabProps) {
-  const { formatCurrency } = useBusiness();
+export function OverviewTab({ summary, isLoading, dateFrom, dateTo }: OverviewTabProps) {
+  const { formatCurrency, currentBusiness } = useBusiness();
+  const [adStats, setAdStats] = useState<CampaignStats | null>(null);
+  const [loadingAdStats, setLoadingAdStats] = useState(false);
+
+  useEffect(() => {
+    if (currentBusiness && dateFrom && dateTo) {
+      loadAdStats();
+    }
+  }, [currentBusiness, dateFrom, dateTo]);
+
+  const loadAdStats = async () => {
+    if (!currentBusiness) return;
+
+    setLoadingAdStats(true);
+    try {
+      const stats = await AdvertisingService.getCampaignStats(
+        currentBusiness.id,
+        dateFrom,
+        dateTo
+      );
+      setAdStats(stats);
+    } catch (error) {
+      console.error('Failed to load ad stats:', error);
+    } finally {
+      setLoadingAdStats(false);
+    }
+  };
 
   const kpis = [
     {
@@ -267,6 +299,88 @@ export function OverviewTab({ summary, isLoading }: OverviewTabProps) {
           </div>
         </Card>
       </div>
+
+      {adStats && adStats.total_campaigns > 0 && (
+        <Card className="p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Target className="h-5 w-5 text-blue-600" />
+            <h3 className="text-lg font-semibold text-gray-900">أداء الحملات الإعلانية</h3>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div className="bg-blue-50 rounded-lg p-4">
+              <p className="text-sm text-blue-700 mb-1">عدد الحملات</p>
+              <p className="text-2xl font-bold text-blue-900">{adStats.total_campaigns}</p>
+            </div>
+            <div className="bg-purple-50 rounded-lg p-4">
+              <p className="text-sm text-purple-700 mb-1">إجمالي الإنفاق</p>
+              <p className="text-2xl font-bold text-purple-900">{formatCurrency(adStats.total_spent)}</p>
+            </div>
+            <div className="bg-green-50 rounded-lg p-4">
+              <p className="text-sm text-green-700 mb-1">الإيرادات من الإعلانات</p>
+              <p className="text-2xl font-bold text-green-900">{formatCurrency(adStats.total_revenue)}</p>
+              <p className="text-xs text-green-600 mt-1">{adStats.total_orders} طلب</p>
+            </div>
+            <div className="bg-orange-50 rounded-lg p-4">
+              <p className="text-sm text-orange-700 mb-1">ROAS</p>
+              <p className={`text-2xl font-bold ${adStats.roas >= 2 ? 'text-green-900' : adStats.roas >= 1 ? 'text-orange-900' : 'text-red-900'}`}>
+                {adStats.roas.toFixed(2)}x
+              </p>
+              <p className="text-xs text-orange-600 mt-1">
+                {adStats.avg_cost_per_order > 0 && `${formatCurrency(adStats.avg_cost_per_order)}/طلب`}
+              </p>
+            </div>
+          </div>
+
+          {adStats.by_platform.length > 0 && (
+            <div>
+              <h4 className="text-sm font-semibold text-gray-700 mb-3">الأداء حسب المنصة</h4>
+              <div className="space-y-2">
+                {adStats.by_platform
+                  .sort((a, b) => b.roas - a.roas)
+                  .slice(0, 5)
+                  .map((platform) => (
+                    <div key={platform.platform} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-sm font-medium text-gray-900 capitalize">
+                            {platform.platform === 'facebook' && 'فيسبوك'}
+                            {platform.platform === 'instagram' && 'انستقرام'}
+                            {platform.platform === 'tiktok' && 'تيك توك'}
+                            {platform.platform === 'google' && 'جوجل'}
+                            {platform.platform === 'snapchat' && 'سناب شات'}
+                            {platform.platform === 'twitter' && 'تويتر'}
+                            {platform.platform === 'linkedin' && 'لينكد إن'}
+                            {platform.platform === 'other' && 'أخرى'}
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            {platform.orders_count} طلب
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-4 text-xs text-gray-600">
+                          <span>إنفاق: {formatCurrency(platform.total_spent)}</span>
+                          <span>إيرادات: {formatCurrency(platform.total_revenue)}</span>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <span className={`text-sm font-bold ${platform.roas >= 2 ? 'text-green-600' : platform.roas >= 1 ? 'text-yellow-600' : 'text-red-600'}`}>
+                          {platform.roas.toFixed(2)}x
+                        </span>
+                        <p className="text-xs text-gray-500">ROAS</p>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+
+          {loadingAdStats && (
+            <div className="text-center py-4 text-gray-500">
+              جاري تحميل بيانات الإعلانات...
+            </div>
+          )}
+        </Card>
+      )}
     </div>
   );
 }
