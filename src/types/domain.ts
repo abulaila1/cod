@@ -1,11 +1,19 @@
 export interface Status {
   id: string;
   business_id?: string;
+  key?: string;
   name_ar: string;
   name_en?: string;
   color?: string;
   is_default?: boolean;
   display_order?: number;
+  sort_order?: number;
+  counts_as_delivered: boolean;
+  counts_as_return: boolean;
+  counts_as_active: boolean;
+  is_final: boolean;
+  is_system_default: boolean;
+  status_type?: 'delivered' | 'returned' | 'active' | 'canceled';
   created_at?: string;
 }
 
@@ -169,6 +177,14 @@ export interface CreateStatusInput {
   color?: string;
   is_default?: boolean;
   display_order?: number;
+  sort_order?: number;
+  key?: string;
+  counts_as_delivered?: boolean;
+  counts_as_return?: boolean;
+  counts_as_active?: boolean;
+  is_final?: boolean;
+  is_system_default?: boolean;
+  status_type?: 'delivered' | 'returned' | 'active' | 'canceled';
 }
 
 export interface UpdateStatusInput {
@@ -177,6 +193,20 @@ export interface UpdateStatusInput {
   color?: string;
   is_default?: boolean;
   display_order?: number;
+  sort_order?: number;
+  counts_as_delivered?: boolean;
+  counts_as_return?: boolean;
+  counts_as_active?: boolean;
+  is_final?: boolean;
+  status_type?: 'delivered' | 'returned' | 'active' | 'canceled';
+}
+
+export interface StatusValidationResult {
+  isValid: boolean;
+  canDelete: boolean;
+  errors: string[];
+  warnings: string[];
+  reason?: string;
 }
 
 export interface OrderWithRelations extends Order {

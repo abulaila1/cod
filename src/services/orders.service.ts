@@ -292,13 +292,13 @@ export class OrdersService {
 
     const updateData: Record<string, unknown> = { status_id: statusId };
 
-    if (newStatus?.key === 'confirmed' || newStatus?.counts_as_delivered) {
+    if (newStatus?.key === 'confirmed') {
       updateData.confirmed_at = new Date().toISOString();
     }
-    if (newStatus?.key === 'shipped') {
+    if (newStatus?.key === 'shipped' || newStatus?.key === 'shipping') {
       updateData.shipped_at = new Date().toISOString();
     }
-    if (newStatus?.key === 'delivered') {
+    if (newStatus?.counts_as_delivered) {
       updateData.delivered_at = new Date().toISOString();
     }
 
@@ -510,11 +510,11 @@ export class OrdersService {
 
     const { data: statuses } = await supabase
       .from('statuses')
-      .select('id, key')
+      .select('id, counts_as_delivered, counts_as_return')
       .eq('business_id', businessId);
 
-    const deliveredStatus = statuses?.find(s => s.key === 'delivered');
-    const returnedStatus = statuses?.find(s => s.key === 'returned' || s.key === 'rto');
+    const deliveredStatus = statuses?.find(s => s.counts_as_delivered);
+    const returnedStatus = statuses?.find(s => s.counts_as_return);
 
     for (const update of updates) {
       try {
