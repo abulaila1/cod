@@ -125,12 +125,12 @@ export function EmployeeDashboard() {
               <span className="text-sm text-slate-600">الحالة</span>
               <span
                 className={`text-sm font-medium px-3 py-1 rounded-full ${
-                  employee.active
+                  employee.is_active
                     ? 'bg-green-100 text-green-700'
                     : 'bg-red-100 text-red-700'
                 }`}
               >
-                {employee.active ? 'نشط' : 'غير نشط'}
+                {employee.is_active ? 'نشط' : 'غير نشط'}
               </span>
             </div>
           </div>

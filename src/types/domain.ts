@@ -24,7 +24,7 @@ export interface Carrier {
   name_ar: string;
   name_en?: string | null;
   tracking_url?: string | null;
-  active: boolean;
+  is_active: boolean;
   created_at: string;
 }
 
@@ -44,7 +44,7 @@ export interface Employee {
   business_id: string;
   name_ar: string;
   name_en: string | null;
-  active: boolean;
+  is_active: boolean;
   created_at: string;
 }
 

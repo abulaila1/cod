@@ -23,7 +23,7 @@ export function EmployeeProtectedRoute({ children }: EmployeeProtectedRouteProps
     return <Navigate to="/employee/login" replace />;
   }
 
-  if (!employee.active) {
+  if (!employee.is_active) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-8 text-center">

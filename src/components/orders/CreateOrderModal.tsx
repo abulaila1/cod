@@ -450,7 +450,7 @@ export function CreateOrderModal({
                     onChange={(e) => setForm({ ...form, carrier_id: e.target.value })}
                   >
                     <option value="">اختر شركة الشحن</option>
-                    {carriers.filter((c) => c.active).map((carrier) => (
+                    {carriers.filter((c) => c.is_active).map((carrier) => (
                       <option key={carrier.id} value={carrier.id}>
                         {carrier.name_ar}
                       </option>
@@ -466,7 +466,7 @@ export function CreateOrderModal({
                     onChange={(e) => setForm({ ...form, employee_id: e.target.value })}
                   >
                     <option value="">اختر الموظف</option>
-                    {employees.filter((e) => e.active).map((employee) => (
+                    {employees.filter((e) => e.is_active).map((employee) => (
                       <option key={employee.id} value={employee.id}>
                         {employee.name_ar}
                       </option>
