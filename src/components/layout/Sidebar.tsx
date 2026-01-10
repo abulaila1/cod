@@ -9,6 +9,7 @@ import {
   BarChart3,
   Settings,
   X,
+  Target,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -24,6 +25,7 @@ const menuItems = [
   { path: '/app/countries', label: 'الدول/المناطق', icon: Globe },
   { path: '/app/employees', label: 'الموظفين', icon: Users },
   { path: '/app/reports', label: 'التقارير', icon: BarChart3 },
+  { path: '/app/advertising', label: 'الإعلانات', icon: Target },
   { path: '/app/statuses', label: 'حالات الطلب', icon: Settings },
   { path: '/app/workspace', label: 'الوورك سبيس', icon: Users },
   { path: '/app/settings', label: 'الإعدادات', icon: Settings },

@@ -31,6 +31,7 @@ import { Reports } from '@/pages/app/Reports';
 import { Settings } from '@/pages/app/Settings';
 import { Workspace } from '@/pages/app/Workspace';
 import { Statuses } from '@/pages/app/Statuses';
+import { Advertising } from '@/pages/app/Advertising';
 
 import { ProductsManagement } from '@/pages/app/settings/ProductsManagement';
 import { CountriesManagement } from '@/pages/app/settings/CountriesManagement';
@@ -107,6 +108,7 @@ function App() {
                   <Route path="employees" element={<Employees />} />
                   <Route path="employees/:id" element={<EmployeeDetails />} />
                   <Route path="reports" element={<Reports />} />
+                  <Route path="advertising" element={<Advertising />} />
                   <Route path="settings" element={<Settings />} />
                   <Route path="workspace" element={<Workspace />} />
                   <Route path="statuses" element={<Statuses />} />
