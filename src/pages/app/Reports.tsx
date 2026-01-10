@@ -2,19 +2,29 @@ import { useState, useEffect } from 'react';
 import { PageHeader } from '@/components/common/PageHeader';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { ReportsService } from '@/services/reports.service';
+import { AdvancedReportsService } from '@/services/advanced-reports.service';
 import { EntitiesService, StatusService } from '@/services';
-import { ReportsSummary } from '@/components/reports/ReportsSummary';
-import { ReportsTable } from '@/components/reports/ReportsTable';
+import { Tabs } from '@/components/ui/Tabs';
 import { ReportsToolbar } from '@/components/reports/ReportsToolbar';
 import { FiltersPanel } from '@/components/orders/FiltersPanel';
 import { SavedReportModal } from '@/components/reports/SavedReportModal';
 import { SavedReportsDropdown } from '@/components/reports/SavedReportsDropdown';
+import { OverviewTab } from '@/components/reports/OverviewTab';
+import { ProductsTab } from '@/components/reports/ProductsTab';
+import { CustomersTab } from '@/components/reports/CustomersTab';
+import { CarriersTab } from '@/components/reports/CarriersTab';
+import { EmployeesTab } from '@/components/reports/EmployeesTab';
 import { exportToCSV } from '@/utils/csv';
 import type {
   ReportGroupBy,
   ReportFilters,
-  ReportSummary,
-  ReportRow,
+  ReportTab,
+  AdvancedReportSummary,
+  ProductPerformance,
+  CustomerPerformance,
+  CarrierPerformance,
+  CityPerformance,
+  EmployeePerformance,
   SavedReport,
 } from '@/types/reports';
 import type { Status, Country, Carrier, Employee } from '@/types/domain';
@@ -26,6 +36,7 @@ export function Reports() {
   const thirtyDaysAgo = new Date(today);
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
+  const [activeTab, setActiveTab] = useState<ReportTab>('overview');
   const [dateFrom, setDateFrom] = useState(thirtyDaysAgo.toISOString().split('T')[0]);
   const [dateTo, setDateTo] = useState(today.toISOString().split('T')[0]);
   const [groupBy, setGroupBy] = useState<ReportGroupBy>('day');
@@ -36,22 +47,18 @@ export function Reports() {
   const [employeeId, setEmployeeId] = useState('');
   const [statusId, setStatusId] = useState('');
 
-  const [summary, setSummary] = useState<ReportSummary>({
-    total_orders: 0,
-    delivered_orders: 0,
-    return_orders: 0,
-    delivery_rate: 0,
-    gross_sales: 0,
-    net_profit: 0,
-    aov: 0,
-  });
-  const [rows, setRows] = useState<ReportRow[]>([]);
+  const [advancedSummary, setAdvancedSummary] = useState<AdvancedReportSummary | null>(null);
+  const [products, setProducts] = useState<ProductPerformance[]>([]);
+  const [customers, setCustomers] = useState<CustomerPerformance[]>([]);
+  const [carriers, setCarriers] = useState<CarrierPerformance[]>([]);
+  const [cities, setCities] = useState<CityPerformance[]>([]);
+  const [employees, setEmployees] = useState<EmployeePerformance[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const [statuses, setStatuses] = useState<Status[]>([]);
   const [countries, setCountries] = useState<Country[]>([]);
-  const [carriers, setCarriers] = useState<Carrier[]>([]);
-  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [carriersFilter, setCarriersFilter] = useState<Carrier[]>([]);
+  const [employeesFilter, setEmployeesFilter] = useState<Employee[]>([]);
 
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
@@ -66,9 +73,9 @@ export function Reports() {
 
   useEffect(() => {
     if (currentBusiness) {
-      loadReports();
+      loadAdvancedReports();
     }
-  }, [currentBusiness, dateFrom, dateTo, groupBy, includeAdCost, countryId, carrierId, employeeId, statusId]);
+  }, [currentBusiness, activeTab, dateFrom, dateTo, groupBy, includeAdCost, countryId, carrierId, employeeId, statusId]);
 
   const loadFilterOptions = async () => {
     if (!currentBusiness) return;
@@ -83,8 +90,8 @@ export function Reports() {
 
       setStatuses(statusesData);
       setCountries(countriesData);
-      setCarriers(carriersData);
-      setEmployees(employeesData);
+      setCarriersFilter(carriersData);
+      setEmployeesFilter(employeesData);
     } catch (error) {
       console.error('Failed to load filter options:', error);
     }
@@ -101,7 +108,7 @@ export function Reports() {
     }
   };
 
-  const loadReports = async () => {
+  const loadAdvancedReports = async () => {
     if (!currentBusiness) return;
 
     try {
@@ -119,35 +126,82 @@ export function Reports() {
       if (employeeId) filters.employee_id = employeeId;
       if (statusId) filters.status_id = statusId;
 
-      const [summaryData, tableData] = await Promise.all([
-        ReportsService.getSummary(currentBusiness.id, filters),
-        ReportsService.getTableData(currentBusiness.id, filters),
-      ]);
-
-      setSummary(summaryData);
-      setRows(tableData.rows);
+      if (activeTab === 'overview') {
+        const summary = await AdvancedReportsService.getAdvancedSummary(currentBusiness.id, filters);
+        setAdvancedSummary(summary);
+      } else if (activeTab === 'products') {
+        const productsData = await AdvancedReportsService.getProductsPerformance(currentBusiness.id, filters);
+        setProducts(productsData);
+      } else if (activeTab === 'customers') {
+        const customersData = await AdvancedReportsService.getCustomersPerformance(currentBusiness.id, filters);
+        setCustomers(customersData);
+      } else if (activeTab === 'carriers') {
+        const [carriersData, citiesData] = await Promise.all([
+          AdvancedReportsService.getCarriersPerformance(currentBusiness.id, filters),
+          AdvancedReportsService.getCitiesPerformance(currentBusiness.id, filters),
+        ]);
+        setCarriers(carriersData);
+        setCities(citiesData);
+      } else if (activeTab === 'employees') {
+        const employeesData = await AdvancedReportsService.getEmployeesPerformance(currentBusiness.id, filters);
+        setEmployees(employeesData);
+      }
     } catch (error) {
-      console.error('Failed to load reports:', error);
+      console.error('Failed to load advanced reports:', error);
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleExportCSV = () => {
-    const headers = [
-      { key: 'period_label', label: 'الفترة' },
-      { key: 'total_orders', label: 'إجمالي الطلبات' },
-      { key: 'delivered_orders', label: 'تم التوصيل' },
-      { key: 'return_orders', label: 'مرتجع' },
-      { key: 'delivery_rate', label: 'نسبة التسليم %' },
-      { key: 'gross_sales', label: 'الإيرادات' },
-      { key: 'net_profit', label: 'صافي الربح' },
-      { key: 'aov', label: 'متوسط قيمة الطلب' },
-    ];
+    let data: any[] = [];
+    let headers: any[] = [];
+    let filename = '';
 
-    const filename = `report-${groupBy}-${dateFrom}-${dateTo}.csv`;
+    if (activeTab === 'products') {
+      data = products;
+      headers = [
+        { key: 'name', label: 'المنتج' },
+        { key: 'category_name', label: 'الفئة' },
+        { key: 'total_orders', label: 'عدد الطلبات' },
+        { key: 'revenue', label: 'الإيرادات' },
+        { key: 'profit', label: 'الربح' },
+        { key: 'delivery_rate', label: 'نسبة التسليم' },
+      ];
+      filename = `products-report-${dateFrom}-${dateTo}.csv`;
+    } else if (activeTab === 'customers') {
+      data = customers;
+      headers = [
+        { key: 'name', label: 'العميل' },
+        { key: 'phone', label: 'الهاتف' },
+        { key: 'total_orders', label: 'عدد الطلبات' },
+        { key: 'total_revenue', label: 'الإيرادات' },
+        { key: 'avg_order_value', label: 'متوسط الطلب' },
+      ];
+      filename = `customers-report-${dateFrom}-${dateTo}.csv`;
+    } else if (activeTab === 'carriers') {
+      data = carriers;
+      headers = [
+        { key: 'name', label: 'الشركة' },
+        { key: 'total_orders', label: 'عدد الطلبات' },
+        { key: 'delivery_rate', label: 'نسبة التسليم' },
+        { key: 'total_shipping_cost', label: 'تكلفة الشحن' },
+      ];
+      filename = `carriers-report-${dateFrom}-${dateTo}.csv`;
+    } else if (activeTab === 'employees') {
+      data = employees;
+      headers = [
+        { key: 'name', label: 'الموظف' },
+        { key: 'total_orders', label: 'عدد الطلبات' },
+        { key: 'delivery_rate', label: 'نسبة التسليم' },
+        { key: 'revenue', label: 'الإيرادات' },
+      ];
+      filename = `employees-report-${dateFrom}-${dateTo}.csv`;
+    }
 
-    exportToCSV(rows, filename, headers);
+    if (data.length > 0) {
+      exportToCSV(data, filename, headers);
+    }
   };
 
   const handleSaveReport = async (name: string) => {
@@ -210,10 +264,18 @@ export function Reports() {
     );
   }
 
+  const tabs = [
+    { id: 'overview' as ReportTab, label: 'نظرة عامة' },
+    { id: 'products' as ReportTab, label: 'المنتجات' },
+    { id: 'customers' as ReportTab, label: 'العملاء' },
+    { id: 'carriers' as ReportTab, label: 'الشحن والمدن' },
+    { id: 'employees' as ReportTab, label: 'الموظفين' },
+  ];
+
   return (
     <>
       <div className="flex items-center justify-between mb-6">
-        <PageHeader title="التقارير" description="تقارير يومية وأسبوعية وشهرية" />
+        <PageHeader title="التقارير المتقدمة" description="تقارير شاملة وتحليلات تفصيلية للبيزنس" />
         <SavedReportsDropdown
           reports={savedReports}
           onSelect={handleSelectSavedReport}
@@ -231,19 +293,33 @@ export function Reports() {
         onDateToChange={setDateTo}
         onGroupByChange={setGroupBy}
         onIncludeAdCostChange={setIncludeAdCost}
-        onRefresh={loadReports}
+        onRefresh={loadAdvancedReports}
         onExport={handleExportCSV}
         onSaveReport={() => setIsSaveModalOpen(true)}
         onShowFilters={() => setIsFiltersOpen(true)}
       />
 
-      <ReportsSummary summary={summary} isLoading={isLoading} />
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6">
+        <Tabs tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
+      </div>
 
-      <ReportsTable
-        rows={rows}
-        groupBy={groupBy}
-        filters={{ country_id: countryId, carrier_id: carrierId, employee_id: employeeId, status_id: statusId }}
-      />
+      <div className="mt-6">
+        {activeTab === 'overview' && advancedSummary && (
+          <OverviewTab summary={advancedSummary} isLoading={isLoading} />
+        )}
+        {activeTab === 'products' && (
+          <ProductsTab products={products} isLoading={isLoading} />
+        )}
+        {activeTab === 'customers' && (
+          <CustomersTab customers={customers} isLoading={isLoading} />
+        )}
+        {activeTab === 'carriers' && (
+          <CarriersTab carriers={carriers} cities={cities} isLoading={isLoading} />
+        )}
+        {activeTab === 'employees' && (
+          <EmployeesTab employees={employees} isLoading={isLoading} />
+        )}
+      </div>
 
       <FiltersPanel
         isOpen={isFiltersOpen}
@@ -257,8 +333,8 @@ export function Reports() {
         onApply={handleApplyFilters}
         statuses={statuses}
         countries={countries}
-        carriers={carriers}
-        employees={employees}
+        carriers={carriersFilter}
+        employees={employeesFilter}
       />
 
       <SavedReportModal
