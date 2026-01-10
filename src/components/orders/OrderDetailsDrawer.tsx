@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Button, Card, CardContent, CardHeader, Badge, Select, Input, Textarea } from '@/components/ui';
-import { OrdersService } from '@/services';
+import { OrdersService, CarriersService } from '@/services';
 import type { OrderWithRelations, Status, AuditLogWithUser, OrderUpdatePatch, OrderItemWithProduct } from '@/types/domain';
+import type { Carrier } from '@/services/carriers.service';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBusiness } from '@/contexts/BusinessContext';
 import {
@@ -46,6 +47,7 @@ export function OrderDetailsDrawer({
   const [order, setOrder] = useState<OrderWithRelations | null>(null);
   const [orderItems, setOrderItems] = useState<OrderItemWithProduct[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLogWithUser[]>([]);
+  const [carriers, setCarriers] = useState<Carrier[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -58,8 +60,18 @@ export function OrderDetailsDrawer({
   useEffect(() => {
     if (isOpen && orderId) {
       loadOrderDetails();
+      loadCarriers();
     }
   }, [isOpen, orderId]);
+
+  const loadCarriers = async () => {
+    try {
+      const carriersList = await CarriersService.list(businessId, { activeOnly: true });
+      setCarriers(carriersList);
+    } catch (error) {
+      console.error('Failed to load carriers:', error);
+    }
+  };
 
   const loadOrderDetails = async () => {
     try {
@@ -86,6 +98,7 @@ export function OrderDetailsDrawer({
           customer_name: orderData.customer_name || '',
           customer_phone: orderData.customer_phone || '',
           customer_address: orderData.customer_address || '',
+          carrier_id: orderData.carrier_id || '',
         });
       }
     } catch (error) {
@@ -434,9 +447,25 @@ export function OrderDetailsDrawer({
                         </div>
                         <div>
                           <p className="text-sm text-zinc-500 mb-1">شركة الشحن</p>
-                          <p className="text-base text-zinc-950">
-                            {order.carrier?.name_ar || '-'}
-                          </p>
+                          {isEditing ? (
+                            <Select
+                              value={editForm.carrier_id || ''}
+                              onChange={(e) =>
+                                setEditForm({ ...editForm, carrier_id: e.target.value })
+                              }
+                            >
+                              <option value="">اختر شركة الشحن</option>
+                              {carriers.map((carrier) => (
+                                <option key={carrier.id} value={carrier.id}>
+                                  {carrier.name_ar}
+                                </option>
+                              ))}
+                            </Select>
+                          ) : (
+                            <p className="text-base text-zinc-950">
+                              {order.carrier?.name_ar || '-'}
+                            </p>
+                          )}
                         </div>
                       </div>
 

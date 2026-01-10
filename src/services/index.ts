@@ -8,3 +8,4 @@ export * from './status.service';
 export * from './entities.service';
 export * from './orders.service';
 export * from './customers.service';
+export * from './carriers.service';
