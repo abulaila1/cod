@@ -63,54 +63,68 @@ export class AnalyticsService {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
+    const formatDateStart = (date: Date): string => {
+      return date.toISOString().split('T')[0] + 'T00:00:00.000Z';
+    };
+
+    const formatDateEnd = (date: Date): string => {
+      return date.toISOString().split('T')[0] + 'T23:59:59.999Z';
+    };
+
     switch (period) {
       case 'today': {
-        const from = today.toISOString().split('T')[0];
-        const to = from;
-        return { from, to };
+        return {
+          from: formatDateStart(today),
+          to: formatDateEnd(today)
+        };
       }
       case 'yesterday': {
         const yesterday = new Date(today);
         yesterday.setDate(yesterday.getDate() - 1);
-        const from = yesterday.toISOString().split('T')[0];
-        return { from, to: from };
+        return {
+          from: formatDateStart(yesterday),
+          to: formatDateEnd(yesterday)
+        };
       }
       case 'last7days': {
         const from = new Date(today);
         from.setDate(from.getDate() - 6);
         return {
-          from: from.toISOString().split('T')[0],
-          to: today.toISOString().split('T')[0]
+          from: formatDateStart(from),
+          to: formatDateEnd(today)
         };
       }
       case 'last30days': {
         const from = new Date(today);
         from.setDate(from.getDate() - 29);
         return {
-          from: from.toISOString().split('T')[0],
-          to: today.toISOString().split('T')[0]
+          from: formatDateStart(from),
+          to: formatDateEnd(today)
         };
       }
       case 'thisMonth': {
         const from = new Date(now.getFullYear(), now.getMonth(), 1);
         return {
-          from: from.toISOString().split('T')[0],
-          to: today.toISOString().split('T')[0]
+          from: formatDateStart(from),
+          to: formatDateEnd(today)
         };
       }
       case 'lastMonth': {
         const from = new Date(now.getFullYear(), now.getMonth() - 1, 1);
         const to = new Date(now.getFullYear(), now.getMonth(), 0);
         return {
-          from: from.toISOString().split('T')[0],
-          to: to.toISOString().split('T')[0]
+          from: formatDateStart(from),
+          to: formatDateEnd(to)
         };
       }
-      default:
+      default: {
+        const from = new Date(today);
+        from.setDate(from.getDate() - 29);
         return {
-          from: new Date(today.setDate(today.getDate() - 29)).toISOString().split('T')[0],
-          to: new Date().toISOString().split('T')[0]
+          from: formatDateStart(from),
+          to: formatDateEnd(today)
         };
+      }
     }
   }
 
