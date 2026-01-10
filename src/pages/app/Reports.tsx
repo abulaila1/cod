@@ -304,8 +304,38 @@ export function Reports() {
       </div>
 
       <div className="mt-6">
-        {activeTab === 'overview' && advancedSummary && (
-          <OverviewTab summary={advancedSummary} isLoading={isLoading} />
+        {activeTab === 'overview' && (
+          <OverviewTab
+            summary={advancedSummary || {
+              total_orders: 0,
+              delivered_orders: 0,
+              return_orders: 0,
+              delivery_rate: 0,
+              gross_sales: 0,
+              net_profit: 0,
+              aov: 0,
+              total_cost: 0,
+              total_cogs: 0,
+              total_shipping: 0,
+              total_ad_cost: 0,
+              total_cod_fees: 0,
+              net_profit_before_ads: 0,
+              profit_margin: 0,
+              average_order_cost: 0,
+              cost_to_revenue_ratio: 0,
+              new_customers: 0,
+              repeat_customers: 0,
+              pending_orders: 0,
+              active_orders: 0,
+              late_orders: 0,
+              average_delivery_time: 0,
+              first_attempt_success_rate: 0,
+              cod_collected: 0,
+              cod_pending: 0,
+              collection_rate: 0,
+            }}
+            isLoading={isLoading}
+          />
         )}
         {activeTab === 'products' && (
           <ProductsTab products={products} isLoading={isLoading} />
