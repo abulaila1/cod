@@ -85,7 +85,8 @@ export function FiltersPanel({
   useEffect(() => {
     let count = 0;
     if (filters.date_from || filters.date_to) count++;
-    if (filters.status_id || (filters.status_ids && filters.status_ids.length > 0)) count++;
+    if (filters.status_id) count++;
+    if (filters.status_ids && filters.status_ids.length > 0) count++;
     if (filters.country_id) count++;
     if (filters.city_id) count++;
     if (filters.carrier_id) count++;
@@ -252,18 +253,73 @@ export function FiltersPanel({
           <div className="border-b border-zinc-100 pb-4">
             <SectionHeader title="الحالة" section="status" />
             {expandedSections.status && (
-              <div className="mt-3">
-                <Select
-                  value={filters.status_id || ''}
-                  onChange={(e) => handleChange('status_id', e.target.value)}
-                >
-                  <option value="">الكل</option>
-                  {statuses.map((status) => (
-                    <option key={status.id} value={status.id}>
-                      {status.name_ar}
-                    </option>
-                  ))}
-                </Select>
+              <div className="mt-3 space-y-3">
+                <div className="w-full">
+                  <label className="block text-xs font-medium text-zinc-600 mb-1.5">
+                    فلاتر سريعة
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => {
+                        const activeStatuses = statuses.filter(s => s.counts_as_active).map(s => s.id);
+                        handleChange('status_ids', activeStatuses.length > 0 ? activeStatuses : undefined);
+                        handleChange('status_id', undefined);
+                      }}
+                      className="inline-flex items-center justify-center gap-2 font-medium transition-smooth focus-ring rounded-xl disabled:opacity-50 disabled:cursor-not-allowed border border-zinc-300 text-zinc-950 hover:bg-zinc-50 hover:border-zinc-400 px-6 py-3 text-base w-full justify-start"
+                    >
+                      <span className="text-sm">⏳ نشطة</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        const deliveredStatuses = statuses.filter(s => s.counts_as_delivered).map(s => s.id);
+                        handleChange('status_ids', deliveredStatuses.length > 0 ? deliveredStatuses : undefined);
+                        handleChange('status_id', undefined);
+                      }}
+                      className="inline-flex items-center justify-center gap-2 font-medium transition-smooth focus-ring rounded-xl disabled:opacity-50 disabled:cursor-not-allowed border border-zinc-300 text-zinc-950 hover:bg-zinc-50 hover:border-zinc-400 px-6 py-3 text-base w-full justify-start"
+                    >
+                      <span className="text-sm">✅ مسلمة</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        const returnedStatuses = statuses.filter(s => s.counts_as_return).map(s => s.id);
+                        handleChange('status_ids', returnedStatuses.length > 0 ? returnedStatuses : undefined);
+                        handleChange('status_id', undefined);
+                      }}
+                      className="inline-flex items-center justify-center gap-2 font-medium transition-smooth focus-ring rounded-xl disabled:opacity-50 disabled:cursor-not-allowed border border-zinc-300 text-zinc-950 hover:bg-zinc-50 hover:border-zinc-400 px-6 py-3 text-base w-full justify-start"
+                    >
+                      <span className="text-sm">↩️ مرتجعة</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        const finalStatuses = statuses.filter(s => s.is_final).map(s => s.id);
+                        handleChange('status_ids', finalStatuses.length > 0 ? finalStatuses : undefined);
+                        handleChange('status_id', undefined);
+                      }}
+                      className="inline-flex items-center justify-center gap-2 font-medium transition-smooth focus-ring rounded-xl disabled:opacity-50 disabled:cursor-not-allowed border border-zinc-300 text-zinc-950 hover:bg-zinc-50 hover:border-zinc-400 px-6 py-3 text-base w-full justify-start"
+                    >
+                      <span className="text-sm">🔒 نهائية</span>
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-zinc-600 mb-1.5">
+                    أو اختر حالة محددة
+                  </label>
+                  <Select
+                    value={filters.status_id || ''}
+                    onChange={(e) => {
+                      handleChange('status_id', e.target.value);
+                      handleChange('status_ids', undefined);
+                    }}
+                  >
+                    <option value="">الكل</option>
+                    {statuses.map((status) => (
+                      <option key={status.id} value={status.id}>
+                        {status.name_ar}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
               </div>
             )}
           </div>
