@@ -27,7 +27,7 @@ import type {
   EmployeePerformance,
   SavedReport,
 } from '@/types/reports';
-import type { Status, Country, Carrier, Employee } from '@/types/domain';
+import type { Status, Country, Carrier, Employee, OrderFilters } from '@/types/domain';
 
 export function Reports() {
   const { currentBusiness } = useBusiness();
@@ -42,10 +42,10 @@ export function Reports() {
   const [groupBy, setGroupBy] = useState<ReportGroupBy>('day');
   const [includeAdCost, setIncludeAdCost] = useState(false);
 
-  const [countryId, setCountryId] = useState('');
-  const [carrierId, setCarrierId] = useState('');
-  const [employeeId, setEmployeeId] = useState('');
-  const [statusId, setStatusId] = useState('');
+  const [filters, setFilters] = useState<OrderFilters>({
+    date_from: thirtyDaysAgo.toISOString().split('T')[0],
+    date_to: today.toISOString().split('T')[0],
+  });
 
   const [advancedSummary, setAdvancedSummary] = useState<AdvancedReportSummary | null>(null);
   const [products, setProducts] = useState<ProductPerformance[]>([]);
@@ -72,10 +72,18 @@ export function Reports() {
   }, [currentBusiness]);
 
   useEffect(() => {
+    setFilters(prev => ({
+      ...prev,
+      date_from: dateFrom,
+      date_to: dateTo,
+    }));
+  }, [dateFrom, dateTo]);
+
+  useEffect(() => {
     if (currentBusiness) {
       loadAdvancedReports();
     }
-  }, [currentBusiness, activeTab, dateFrom, dateTo, groupBy, includeAdCost, countryId, carrierId, employeeId, statusId]);
+  }, [currentBusiness, activeTab, filters, groupBy, includeAdCost]);
 
   const loadFilterOptions = async () => {
     if (!currentBusiness) return;
@@ -114,36 +122,41 @@ export function Reports() {
     try {
       setIsLoading(true);
 
-      const filters: ReportFilters = {
-        date_from: dateFrom,
-        date_to: dateTo,
+      const reportFilters: ReportFilters = {
+        date_from: filters.date_from || dateFrom,
+        date_to: filters.date_to || dateTo,
         group_by: groupBy,
         include_ad_cost: includeAdCost,
+        country_id: filters.country_id,
+        city_id: filters.city_id,
+        carrier_id: filters.carrier_id,
+        employee_id: filters.employee_id,
+        status_id: filters.status_id,
+        product_id: filters.product_id,
+        collection_status: filters.collection_status,
+        order_source: filters.order_source,
+        has_tracking: filters.has_tracking,
+        is_late: filters.is_late,
       };
 
-      if (countryId) filters.country_id = countryId;
-      if (carrierId) filters.carrier_id = carrierId;
-      if (employeeId) filters.employee_id = employeeId;
-      if (statusId) filters.status_id = statusId;
-
       if (activeTab === 'overview') {
-        const summary = await AdvancedReportsService.getAdvancedSummary(currentBusiness.id, filters);
+        const summary = await AdvancedReportsService.getAdvancedSummary(currentBusiness.id, reportFilters);
         setAdvancedSummary(summary);
       } else if (activeTab === 'products') {
-        const productsData = await AdvancedReportsService.getProductsPerformance(currentBusiness.id, filters);
+        const productsData = await AdvancedReportsService.getProductsPerformance(currentBusiness.id, reportFilters);
         setProducts(productsData);
       } else if (activeTab === 'customers') {
-        const customersData = await AdvancedReportsService.getCustomersPerformance(currentBusiness.id, filters);
+        const customersData = await AdvancedReportsService.getCustomersPerformance(currentBusiness.id, reportFilters);
         setCustomers(customersData);
       } else if (activeTab === 'carriers') {
         const [carriersData, citiesData] = await Promise.all([
-          AdvancedReportsService.getCarriersPerformance(currentBusiness.id, filters),
-          AdvancedReportsService.getCitiesPerformance(currentBusiness.id, filters),
+          AdvancedReportsService.getCarriersPerformance(currentBusiness.id, reportFilters),
+          AdvancedReportsService.getCitiesPerformance(currentBusiness.id, reportFilters),
         ]);
         setCarriers(carriersData);
         setCities(citiesData);
       } else if (activeTab === 'employees') {
-        const employeesData = await AdvancedReportsService.getEmployeesPerformance(currentBusiness.id, filters);
+        const employeesData = await AdvancedReportsService.getEmployeesPerformance(currentBusiness.id, reportFilters);
         setEmployees(employeesData);
       }
     } catch (error) {
@@ -245,12 +258,20 @@ export function Reports() {
     }
   };
 
-  const handleApplyFilters = (filters: any) => {
-    setCountryId(filters.country_id || '');
-    setCarrierId(filters.carrier_id || '');
-    setEmployeeId(filters.employee_id || '');
-    setStatusId(filters.status_id || '');
-    setIsFiltersOpen(false);
+  const handleFiltersChange = (newFilters: OrderFilters) => {
+    setFilters(newFilters);
+    if (newFilters.date_from) setDateFrom(newFilters.date_from);
+    if (newFilters.date_to) setDateTo(newFilters.date_to);
+  };
+
+  const handleClearFilters = () => {
+    const clearedFilters: OrderFilters = {
+      date_from: thirtyDaysAgo.toISOString().split('T')[0],
+      date_to: today.toISOString().split('T')[0],
+    };
+    setFilters(clearedFilters);
+    setDateFrom(clearedFilters.date_from!);
+    setDateTo(clearedFilters.date_to!);
   };
 
   if (!currentBusiness) {
@@ -354,17 +375,14 @@ export function Reports() {
       <FiltersPanel
         isOpen={isFiltersOpen}
         onClose={() => setIsFiltersOpen(false)}
-        filters={{
-          country_id: countryId,
-          carrier_id: carrierId,
-          employee_id: employeeId,
-          status_id: statusId,
-        }}
-        onApply={handleApplyFilters}
+        filters={filters}
+        onFiltersChange={handleFiltersChange}
+        onClear={handleClearFilters}
         statuses={statuses}
         countries={countries}
         carriers={carriersFilter}
         employees={employeesFilter}
+        businessId={currentBusiness.id}
       />
 
       <SavedReportModal
