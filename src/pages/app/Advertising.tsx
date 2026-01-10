@@ -527,12 +527,15 @@ export function Advertising() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
               المنتجات المستهدفة
             </label>
+            <p className="text-xs text-gray-500 mb-3">
+              اختر المنتجات التي تستهدفها هذه الحملة وحدد نسبة التوزيع لكل منتج (يجب أن يكون المجموع 100%)
+            </p>
             <div className="space-y-2">
               {formData.products.map((product, index) => (
-                <div key={index} className="flex gap-2">
+                <div key={index} className="flex gap-2 items-center">
                   <Select
                     value={product.product_id}
                     onChange={(e) =>
@@ -547,23 +550,30 @@ export function Advertising() {
                       </option>
                     ))}
                   </Select>
-                  <Input
-                    type="number"
-                    value={product.allocation_percentage}
-                    onChange={(e) =>
-                      handleProductChange(
-                        index,
-                        'allocation_percentage',
-                        Number(e.target.value)
-                      )
-                    }
-                    placeholder="%"
-                    className="w-24"
-                  />
+                  <div className="flex items-center gap-1">
+                    <Input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="1"
+                      value={product.allocation_percentage}
+                      onChange={(e) =>
+                        handleProductChange(
+                          index,
+                          'allocation_percentage',
+                          Number(e.target.value)
+                        )
+                      }
+                      placeholder="0"
+                      className="w-20 text-center"
+                    />
+                    <span className="text-sm text-gray-600 font-medium">%</span>
+                  </div>
                   <Button
                     type="button"
                     variant="outline"
                     onClick={() => handleRemoveProduct(index)}
+                    className="shrink-0"
                   >
                     حذف
                   </Button>
@@ -573,14 +583,20 @@ export function Advertising() {
                 <Plus className="h-4 w-4 ml-2" />
                 إضافة منتج
               </Button>
-              <div className="text-sm">
-                المجموع:{' '}
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <span className="text-sm text-gray-600">مجموع نسب التوزيع:</span>
                 <span
-                  className={`font-bold ${
+                  className={`text-lg font-bold ${
                     totalPercentage === 100 ? 'text-green-600' : 'text-red-600'
                   }`}
                 >
                   {totalPercentage}%
+                  {totalPercentage === 100 && ' ✓'}
+                  {totalPercentage !== 100 && totalPercentage !== 0 && (
+                    <span className="text-xs mr-2 text-red-500">
+                      (يجب أن يكون 100%)
+                    </span>
+                  )}
                 </span>
               </div>
             </div>
