@@ -59,70 +59,73 @@ export interface PeriodRange {
 }
 
 export class AnalyticsService {
+  private static formatDate(date: Date): string {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  private static getNextDay(dateStr: string): string {
+    const date = new Date(dateStr);
+    date.setDate(date.getDate() + 1);
+    return this.formatDate(date);
+  }
+
   static getDateRange(period: string): PeriodRange {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-    const formatDateStart = (date: Date): string => {
-      return date.toISOString().split('T')[0] + 'T00:00:00.000Z';
-    };
-
-    const formatDateEnd = (date: Date): string => {
-      return date.toISOString().split('T')[0] + 'T23:59:59.999Z';
-    };
+    const formatDate = this.formatDate;
 
     switch (period) {
       case 'today': {
-        return {
-          from: formatDateStart(today),
-          to: formatDateEnd(today)
-        };
+        const dateStr = formatDate(today);
+        return { from: dateStr, to: dateStr };
       }
       case 'yesterday': {
         const yesterday = new Date(today);
         yesterday.setDate(yesterday.getDate() - 1);
-        return {
-          from: formatDateStart(yesterday),
-          to: formatDateEnd(yesterday)
-        };
+        const dateStr = formatDate(yesterday);
+        return { from: dateStr, to: dateStr };
       }
       case 'last7days': {
         const from = new Date(today);
         from.setDate(from.getDate() - 6);
         return {
-          from: formatDateStart(from),
-          to: formatDateEnd(today)
+          from: formatDate(from),
+          to: formatDate(today)
         };
       }
       case 'last30days': {
         const from = new Date(today);
         from.setDate(from.getDate() - 29);
         return {
-          from: formatDateStart(from),
-          to: formatDateEnd(today)
+          from: formatDate(from),
+          to: formatDate(today)
         };
       }
       case 'thisMonth': {
         const from = new Date(now.getFullYear(), now.getMonth(), 1);
         return {
-          from: formatDateStart(from),
-          to: formatDateEnd(today)
+          from: formatDate(from),
+          to: formatDate(today)
         };
       }
       case 'lastMonth': {
         const from = new Date(now.getFullYear(), now.getMonth() - 1, 1);
         const to = new Date(now.getFullYear(), now.getMonth(), 0);
         return {
-          from: formatDateStart(from),
-          to: formatDateEnd(to)
+          from: formatDate(from),
+          to: formatDate(to)
         };
       }
       default: {
         const from = new Date(today);
         from.setDate(from.getDate() - 29);
         return {
-          from: formatDateStart(from),
-          to: formatDateEnd(today)
+          from: formatDate(from),
+          to: formatDate(today)
         };
       }
     }
@@ -161,7 +164,7 @@ export class AnalyticsService {
       `)
       .eq('business_id', businessId)
       .gte('order_date', dateRange.from)
-      .lte('order_date', dateRange.to);
+      .lt('order_date', this.getNextDay(dateRange.to));
 
     if (error) throw error;
 
@@ -229,7 +232,7 @@ export class AnalyticsService {
       .select('order_date, revenue, cost, shipping_cost, profit')
       .eq('business_id', businessId)
       .gte('order_date', dateRange.from)
-      .lte('order_date', dateRange.to)
+      .lt('order_date', this.getNextDay(dateRange.to))
       .order('order_date', { ascending: true });
 
     if (error) throw error;
@@ -278,7 +281,7 @@ export class AnalyticsService {
       `)
       .eq('order.business_id', businessId)
       .gte('order.order_date', dateRange.from)
-      .lte('order.order_date', dateRange.to);
+      .lt('order.order_date', this.getNextDay(dateRange.to));
 
     if (error) return [];
 
@@ -337,7 +340,7 @@ export class AnalyticsService {
       `)
       .eq('business_id', businessId)
       .gte('order_date', dateRange.from)
-      .lte('order_date', dateRange.to);
+      .lt('order_date', this.getNextDay(dateRange.to));
 
     if (error) return [];
 
@@ -418,7 +421,7 @@ export class AnalyticsService {
       `)
       .eq('business_id', businessId)
       .gte('order_date', dateRange.from)
-      .lte('order_date', dateRange.to);
+      .lt('order_date', this.getNextDay(dateRange.to));
 
     if (error) return [];
 
