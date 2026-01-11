@@ -1,23 +1,49 @@
-import { Calendar } from 'lucide-react';
-import { Button } from './Button';
+import { Input } from './Input';
 
 interface DateRangePickerProps {
+  startDate: string;
+  endDate: string;
+  onStartDateChange: (date: string) => void;
+  onEndDateChange: (date: string) => void;
   label?: string;
-  placeholder?: string;
 }
 
-export function DateRangePicker({ label, placeholder = 'اختر نطاق التاريخ' }: DateRangePickerProps) {
+export function DateRangePicker({
+  startDate,
+  endDate,
+  onStartDateChange,
+  onEndDateChange,
+  label,
+}: DateRangePickerProps) {
   return (
-    <div className="w-full">
+    <div className="w-full space-y-3">
       {label && (
-        <label className="block text-sm font-medium text-primary-900 mb-1.5">
+        <label className="block text-sm font-medium text-zinc-900 mb-1.5">
           {label}
         </label>
       )}
-      <Button variant="outline" className="w-full justify-start">
-        <Calendar className="ml-2 h-4 w-4" />
-        <span className="text-primary-500">{placeholder}</span>
-      </Button>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs font-medium text-zinc-600 mb-1.5">
+            من تاريخ
+          </label>
+          <Input
+            type="date"
+            value={startDate}
+            onChange={(e) => onStartDateChange(e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-zinc-600 mb-1.5">
+            إلى تاريخ
+          </label>
+          <Input
+            type="date"
+            value={endDate}
+            onChange={(e) => onEndDateChange(e.target.value)}
+          />
+        </div>
+      </div>
     </div>
   );
 }
